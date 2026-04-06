@@ -1,0 +1,30 @@
+# 📦 Node Dependencies
+node_modules/
+
+# 🛡️ Security & Secrets (CRITICAL)
+.env
+backend/.env
+frontend/.env
+*.txt
+backend/token.txt
+backend/fresh_token.txt
+backend/config/*.json
+serviceAccountKey.json
+
+# 💾 Local Data (Forensic Trial Records)
+backend/data/records.json
+
+# 🚀 Build & Production
+frontend/build/
+dist/
+
+# 🧩 Environment & IDE
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# 🏗️ Other
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
