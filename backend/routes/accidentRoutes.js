@@ -16,6 +16,9 @@ const verifyFirebaseToken = require('../middleware/authMiddleware');
 // POST → for simulator
 router.post('/report', apiKeyMiddleware, handleAccidentData);
 
+// 🔍 Forensic Audit: Group Reachability Check
+router.get('/ping', (req, res) => res.json({ status: 'Accident Group Live' }));
+
 // GET → for dashboard
 router.get('/all', verifyFirebaseToken, getAllAccidents);
 

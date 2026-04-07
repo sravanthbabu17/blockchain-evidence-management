@@ -6,7 +6,7 @@ import StatsBar from '../components/StatsBar';
 import Filters from '../components/Filters';
 import CaseCard from '../components/CaseCard';
 
-export default function Dashboard({ user }) { // 🏛️ STEP 4: PASS USER TO DASHBOARD
+export default function Dashboard({ user }) { 
     const [records, setRecords] = useState([]);
     const [filteredRecords, setFilteredRecords] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -118,6 +118,7 @@ export default function Dashboard({ user }) { // 🏛️ STEP 4: PASS USER TO DA
             </h1>
 
             <StatsBar records={visibleRecords} />
+
             
             <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #eee', marginBottom: '30px' }}>
                 <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#666' }}>Investigation Filters</h4>

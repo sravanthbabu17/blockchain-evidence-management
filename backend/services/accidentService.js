@@ -3,6 +3,12 @@ const { uploadJSONToIPFS } = require('./ipfsService');
 const { storeOnBlockchain } = require('./blockchainService');
 const fs = require('fs');
 const path = require('path');
+// Loaded lazily to avoid circular dependency
+let forensicService = null;
+const getForensicService = () => {
+    if (!forensicService) forensicService = require('./forensicService');
+    return forensicService;
+};
 
 // 💾 PERSISTENCE CONFIG
 const DATA_FILE = path.join(__dirname, '../data/records.json');
@@ -105,6 +111,19 @@ exports.processAccidentData = async (data) => {
         saveToFile(); // 💾 Persist instantly
         console.log("📦 FORENSIC RECORD SECURED:", finalRecord.vehicle_id);
 
+        // 🎥 AUTO-TRIGGER FORENSIC VIDEO if impact detected
+        if (data.impact === true) {
+            console.log("💥 Impact flag detected — triggering forensic video capture...");
+            // Fire-and-forget: does not block the sensor response
+            setImmediate(() => {
+                getForensicService().triggerForensicCapture(
+                    finalRecord.id,
+                    finalRecord.vehicle_id,
+                    timestamp
+                );
+            });
+        }
+
         return finalRecord;
 
     } catch (error) {
@@ -141,3 +160,6 @@ exports.updateStatus = (id, status) => {
     }
     throw new Error("Case not found");
 };
+
+// 💾 EXPORT PERSISTENCE (Step 1 Fix)
+exports.saveRecords = saveToFile;

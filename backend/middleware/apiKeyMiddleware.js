@@ -1,6 +1,7 @@
 const VALID_API_KEYS = [
     "device123",   // you can add multiple later
-    "vehicle001"
+    "vehicle001",
+    "SECURE_IOT_KEY_2026"
 ];
 
 module.exports = (req, res, next) => {

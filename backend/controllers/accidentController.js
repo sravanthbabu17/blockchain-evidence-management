@@ -1,4 +1,7 @@
 const accidentService = require('../services/accidentService');
+const ipfsService = require('../services/ipfsService');
+const path = require('path');
+const fs = require('fs');
 
 // 📜 PRIVATE HELPER: Audit Trail Logging
 const _logTimeline = (record, action, by, to = null) => {
@@ -12,22 +15,35 @@ const _logTimeline = (record, action, by, to = null) => {
     }
 };
 
-// 🚨 Handle incoming accident data (POST /report)
+// 🚨 Handle incoming sensor report (POST /report)
+// Note: Forensic video is now triggered separately via /api/impact
 exports.handleAccidentData = async (req, res, next) => {
     try {
         const data = req.body;
         if (!data || Object.keys(data).length === 0) {
             return res.status(400).json({ success: false, message: 'No data received' });
         }
+        
+        console.log("⚡ Processing Incoming Sensor Report (Legacy)...");
         const result = await accidentService.processAccidentData(data);
-        res.status(200).json({ success: true, message: 'Accident processed successfully', data: result });
+        
+        console.log(`✅ Case Created: ${result.id}`);
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Sensor data recorded successfully.', 
+            data: result 
+        });
     } catch (error) {
         console.error("❌ Controller error:", error.message);
-        next(error);
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// 📊 Get all accident records (GET /all) - ROLE PROTECTED (Step 8)
+
+/**
+ * 📊 Get all accident records (GET /all) - ROLE PROTECTED (Step 8)
+ */
 exports.getAllAccidents = (req, res) => {
     try {
         if (!req.user) {

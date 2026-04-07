@@ -138,6 +138,31 @@ export default function CaseDetails({ user }) { // 🏛️ STEP 9: PASS USER
         }
     };
 
+    // 🧪 VIDEO FORENSIC VERIFICATION
+    const verifyVideoIntegrity = async (type, cid, originalHash) => {
+        try {
+            setStatus(`🔍 Auditing ${type} Video...`);
+            const res = await fetch(`https://gateway.pinata.cloud/ipfs/${cid}`);
+            const blob = await res.blob();
+            const buffer = await blob.arrayBuffer();
+
+            const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const videoHash = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+
+            if (videoHash === originalHash) {
+                alert(`✅ Forensic Match! ${type} video is authentic and untampered.\nHash: ${videoHash}`);
+                setStatus(`✅ Video ${type} Verified`);
+            } else {
+                alert(`❌ TAMPERING DETECTED! ${type} video hash does not match blockchain record.`);
+                setStatus(`❌ Video ${type} TAMPERED`);
+            }
+        } catch (err) {
+             console.error("Video Audit Error:", err);
+             alert("❌ Forensic Audit Failed: Could not retrieve IPFS content.");
+        }
+    };
+
     return (
         <div className="dashboard-container">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -260,6 +285,74 @@ export default function CaseDetails({ user }) { // 🏛️ STEP 9: PASS USER
                                 </Marker>
                             </MapContainer>
                         </div>
+
+                        {/* 🎬 FORENSIC VIDEO SECTION (Multi-modal Evidence) */}
+                        {data.video && (
+                            <div style={{ marginTop: '30px', padding: '20px', background: '#f0f2f5', borderRadius: '12px', border: '1px solid #ced4da' }}>
+                                <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: 800, color: '#1a1a1a', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    🎬 {data.video.cid ? "Full Incident Forensic Evidence" : "Multi-modal Forensic Evidence"}
+                                </h3>
+                                
+                                {data.video.local || data.video.cid ? (
+                                    /* 🤖 AUTOMATED: Single Merged Incident (60s) */
+                                    <div style={{ background: '#000', borderRadius: '8px', padding: '10px', overflow: 'hidden' }}>
+                                        <div style={{ color: '#fff', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginBottom: '8px' }}>
+                                            {data.video.local ? "🟢 Local Forensic Source (Fast)" : "🔵 IPFS Forensic Source"}
+                                        </div>
+                                        <video controls width="100%" style={{ borderRadius: '4px', background: '#111' }}>
+                                            <source 
+                                                src={data.video.local ? `http://localhost:5000/${data.video.local}` : `https://gateway.pinata.cloud/ipfs/${data.video.cid}`} 
+                                                type={data.video.local?.endsWith('.mp4') ? "video/mp4" : "video/webm"} 
+                                            />
+                                        </video>
+                                        {(data.video.cid || data.video.local) && (
+                                            <button 
+                                                onClick={() => verifyVideoIntegrity(
+                                                    "Full-Incident", 
+                                                    data.video.cid || data.video.local, 
+                                                    data.video.hash
+                                                )}
+                                                style={{ width: '100%', marginTop: '10px', padding: '8px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                                🔐 Verify Forensic Integrity (SHA-256)
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+
+                                    /* 🏗️ MANUAL: Before/After Bimodal Capture */
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                        {/* Before Impact */}
+                                        <div style={{ background: '#000', borderRadius: '8px', padding: '10px', overflow: 'hidden' }}>
+                                            <div style={{ color: '#fff', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginBottom: '8px' }}>🟡 Before Impact (Buffered)</div>
+                                            <video controls width="100%" style={{ borderRadius: '4px', background: '#111' }}>
+                                                <source src={`https://gateway.pinata.cloud/ipfs/${data.video.beforeCid}`} type="video/webm" />
+                                            </video>
+                                            <button 
+                                                onClick={() => verifyVideoIntegrity("Before-Impact", data.video.beforeCid, data.video.beforeHash)}
+                                                style={{ width: '100%', marginTop: '10px', padding: '8px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                                🔐 Verify Video Integrity
+                                            </button>
+                                        </div>
+
+                                        {/* After Impact */}
+                                        <div style={{ background: '#000', borderRadius: '8px', padding: '10px', overflow: 'hidden' }}>
+                                            <div style={{ color: '#fff', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', marginBottom: '8px' }}>🔴 After Impact (Post-Collision)</div>
+                                            <video controls width="100%" style={{ borderRadius: '4px', background: '#111' }}>
+                                                <source src={`https://gateway.pinata.cloud/ipfs/${data.video.afterCid}`} type="video/webm" />
+                                            </video>
+                                            <button 
+                                                onClick={() => verifyVideoIntegrity("After-Impact", data.video.afterCid, data.video.afterHash)}
+                                                style={{ width: '100%', marginTop: '10px', padding: '8px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                                            >
+                                                🔐 Verify Video Integrity
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* 📜 FORENSIC TIMELINE */}
                         <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '12px', border: '1px solid #eee' }}>
