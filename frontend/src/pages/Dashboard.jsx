@@ -5,143 +5,114 @@ import API from '../services/api';
 import StatsBar from '../components/StatsBar';
 import Filters from '../components/Filters';
 import CaseCard from '../components/CaseCard';
+import AccidentMap from '../components/AccidentMap';
 
-export default function Dashboard({ user }) { 
-    const [records, setRecords] = useState([]);
-    const [filteredRecords, setFilteredRecords] = useState([]);
-    const [loading, setLoading] = useState(true);
-    
-    // 🎭 ROLE FROM LOGIN
-    const role = user.role;
-    const [investigators, setInvestigators] = useState([]);
+export default function Dashboard({ user }) {
+  const [records, setRecords] = useState([]);
+  const [filteredRecords, setFilteredRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('grid'); // 'grid' | 'map'
+  const role = user.role;
+  const [investigators, setInvestigators] = useState([]);
 
-    // 🕵️ FETCH ALL INVESTIGATORS (For Admin Assignment)
-    useEffect(() => {
-        const fetchInvestigators = async () => {
-            if (role !== "admin") return;
-            try {
-                const q = query(collection(db, "users"), where("role", "==", "investigator"));
-                const snapshot = await getDocs(q);
-                const list = snapshot.docs.map(doc => doc.data());
-                setInvestigators(list);
-                console.log("🔍 INVESTIGATORS SYNCED:", list.length);
-            } catch (err) {
-                console.error("Failed to fetch investigators:", err);
-            }
-        };
-        fetchInvestigators();
-    }, [role]);
-
-    useEffect(() => {
-        const fetchDashboardData = async () => {
-            try {
-                setLoading(true);
-                
-                // 🛡️ STEP 7: SEND FIREBASE TOKEN TO BACKEND (Auto-injected by Interceptor)
-                const res = await API.get('/accident/all');
-                
-                const rawData = res.data.data;
-
-                // On Dashboard, we prioritize high performance metadata view.
-                // Deep Forensic Audit is moved to CaseDetails for efficiency.
-                setRecords(rawData);
-                setFilteredRecords(rawData);
-            } catch (error) {
-                console.error("❌ Dashboard Metadata Fetch Error:", error.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchDashboardData();
-    }, [user]);
-
-    // 🕵️ STEP 6: FILTER DATA BASED ON ROLE (CLIENT SIDE GUARD)
-    const filterByRole = (data) => {
-        if (!data) return [];
-        if (role === "admin") return data;
-
-        if (role === "investigator") {
-            // Investigators see ONLY cases assigned directly to their email ID
-            return data.filter(r => r.assignedTo === user.email);
-        }
-
-        if (role === "owner") {
-            // Owners see ONLY their vehicle forensic telemetry (Security Filter)
-            return data.filter(r => r.vehicle_id === user.vehicle_id);
-        }
-
-        return data;
+  useEffect(() => {
+    if (role !== "admin") return;
+    const fetchInvestigators = async () => {
+      try {
+        const q = query(collection(db, "users"), where("role", "==", "investigator"));
+        const snap = await getDocs(q);
+        setInvestigators(snap.docs.map(d => d.data()));
+      } catch (err) { console.error("Failed to fetch investigators:", err); }
     };
+    fetchInvestigators();
+  }, [role]);
 
-    const handleFilter = ({ search, status }) => {
-        let filtered = records;
-        if (search) {
-            filtered = filtered.filter(r => 
-                (r.vehicle_id || "").toLowerCase().includes(search.toLowerCase())
-            );
-        }
-        if (status === "valid") {
-            filtered = filtered.filter(r => r.isVerified === true);
-        } else if (status === "tampered") {
-            filtered = filtered.filter(r => r.isVerified === false);
-        }
-        setFilteredRecords(filtered);
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const res = await API.get('/accident/all');
+        setRecords(res.data.data);
+        setFilteredRecords(res.data.data);
+      } catch (error) {
+        console.error("❌ Dashboard fetch error:", error.message);
+      } finally {
+        setLoading(false);
+      }
     };
+    fetchDashboardData();
+  }, [user]);
 
-    // ✨ APPLY STEP 6 FILTERING
-    const visibleRecords = filterByRole(filteredRecords);
+  const filterByRole = (data) => {
+    if (!data) return [];
+    if (role === "admin") return data;
+    if (role === "investigator") return data.filter(r => r.assignedTo === user.email);
+    if (role === "owner") return data.filter(r => r.vehicle_id === user.vehicle_id);
+    return data;
+  };
 
-    if (loading) {
-        return (
-            <div style={{ textAlign: 'center', paddingTop: '100px' }}>
-                <div style={{ fontSize: '48px', marginBottom: '20px' }}>🕵️</div>
-                <h2>Retrieving Case Files...</h2>
-                <p style={{ color: '#666' }}>Role Identified: <strong>{user.role.toUpperCase()}</strong></p>
-            </div>
-        );
-    }
+  const handleFilter = ({ search, status }) => {
+    let filtered = records;
+    if (search) filtered = filtered.filter(r => (r.vehicle_id || "").toLowerCase().includes(search.toLowerCase()));
+    if (status && status !== 'all') filtered = filtered.filter(r => r.status === status);
+    setFilteredRecords(filtered);
+  };
 
-    return (
-        <div className="dashboard-container">
-            <h1 style={{ 
-                fontSize: '34px', 
-                fontWeight: '900', 
-                color: '#1a1a1a', 
-                marginBottom: '35px',
-                letterSpacing: '-1px',
-                borderLeft: '6px solid #007bff',
-                paddingLeft: '20px',
-                textShadow: '0 1px 2px rgba(0,0,0,0.05)'
-            }}>
-                EvidenceChain Dashboard
-            </h1>
+  const visibleRecords = filterByRole(filteredRecords);
 
-            <StatsBar records={visibleRecords} />
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px' }}>
+      <div style={{ width: 48, height: 48, border: '3px solid var(--border-2)', borderTopColor: 'var(--primary)', borderRadius: '50%' }} className="spinner" />
+      <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading case files for <strong style={{ color: 'var(--text)' }}>{role.toUpperCase()}</strong>...</p>
+    </div>
+  );
 
-            
-            <div style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #eee', marginBottom: '30px' }}>
-                <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#666' }}>Investigation Filters</h4>
-                <Filters onFilter={handleFilter} />
-            </div>
+  return (
+    <div className="dashboard-container fade-in">
+      {/* Page header */}
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '30px', fontWeight: 900, letterSpacing: '-0.5px', background: 'linear-gradient(135deg,#f1f5f9,#94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          EvidenceChain Dashboard
+        </h1>
+        <p style={{ color: 'var(--text-muted)', marginTop: '6px', fontSize: '14px' }}>
+          {visibleRecords.length} case{visibleRecords.length !== 1 ? 's' : ''} visible · Role: <span style={{ color: 'var(--primary)', fontWeight: 700, textTransform: 'uppercase' }}>{role}</span>
+        </p>
+      </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
-                {visibleRecords.length === 0 ? (
-                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '80px', background: '#fff', borderRadius: '12px', color: '#888' }}>
-                        <h3>No Cases Found for Role: {user.role.toUpperCase()}</h3>
-                        <p>Cases appear here once they are generated and assigned by an Admin.</p>
-                    </div>
-                ) : (
-                    visibleRecords.map((record, index) => (
-                        <CaseCard 
-                            key={record.id || index} 
-                            record={record} 
-                            role={user.role} 
-                            investigators={investigators} 
-                        />
-                    ))
-                )}
-            </div>
+      {/* Stats */}
+      <StatsBar records={visibleRecords} />
+
+      {/* Filters + Tab bar */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '16px 20px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <Filters onFilter={handleFilter} />
+        <div className="tab-bar" style={{ marginBottom: 0 }}>
+          <button className={`tab-btn ${view === 'grid' ? 'active' : ''}`} onClick={() => setView('grid')}>⊞ Grid</button>
+          <button className={`tab-btn ${view === 'map' ? 'active' : ''}`} onClick={() => setView('map')}>🗺 Map</button>
         </div>
-    );
+      </div>
+
+      {/* Content */}
+      {view === 'map' ? (
+        <AccidentMap records={visibleRecords} />
+      ) : (
+        visibleRecords.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '80px 20px', background: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-2)', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🗂️</div>
+            <h3 style={{ color: 'var(--text)', marginBottom: '8px' }}>No Cases Found</h3>
+            <p style={{ fontSize: '14px' }}>
+              {role === 'investigator' ? 'No cases have been assigned to you yet.' :
+               role === 'owner' ? 'No incidents recorded for your vehicle.' :
+               'No records match your current filters.'}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+            {visibleRecords.map((record, i) => (
+              <CaseCard key={record.id || i} record={record} role={role} investigators={investigators} />
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
 }

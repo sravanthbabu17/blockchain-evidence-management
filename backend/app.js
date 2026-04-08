@@ -13,7 +13,8 @@ startRecording();
 
 // ✅ IMPORT ROUTES
 const accidentRoutes = require('./routes/accidentRoutes');
-const impactRoutes = require('./routes/impactRoutes'); // Digital Forensic Trigger
+const impactRoutes   = require('./routes/impactRoutes');
+const verifyRoutes   = require('./routes/verifyRoutes');
 
 // 📂 Ensure Directories Exist
 const fs = require('fs');
@@ -26,7 +27,8 @@ app.use('/videos', express.static(path.join(__dirname, 'videos')));
 
 // ✅ MOUNT ROUTES
 app.use('/api/accident', accidentRoutes);
-app.use('/api', impactRoutes); // Trigger: POST /api/impact
+app.use('/api', impactRoutes);
+app.use('/api/verify', verifyRoutes);  // Blockchain integrity verification
 
 // Health check
 app.get('/', (req, res) => {

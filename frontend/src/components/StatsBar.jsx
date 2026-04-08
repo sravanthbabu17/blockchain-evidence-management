@@ -1,49 +1,53 @@
 import React from 'react';
 
-/**
- * Modern StatsBar for Forensic Workflow.
- * Tracks Workflow Stages: Pending, Active (Assigned/Investigating), and Verified.
- */
+const STATS = [
+  { key: 'total',    label: 'Total Cases',  icon: '📁', color: '#3b82f6', glow: 'rgba(59,130,246,0.25)' },
+  { key: 'pending',  label: 'Pending',      icon: '⏳', color: '#f59e0b', glow: 'rgba(245,158,11,0.25)' },
+  { key: 'assigned', label: 'Assigned',     icon: '🔍', color: '#8b5cf6', glow: 'rgba(139,92,246,0.25)' },
+  { key: 'verified', label: 'Verified',     icon: '✅', color: '#10b981', glow: 'rgba(16,185,129,0.25)' },
+];
+
 export default function StatsBar({ records }) {
-  const total = records.length;
-  
-  // 📋 WORKFLOW METRICS
-  const pending = records.filter(r => (r.status || "pending") === "pending").length;
-  const active = records.filter(r => r.status === "assigned" || r.status === "investigating").length;
-  const verified = records.filter(r => r.status === "verified").length;
+  const counts = {
+    total:    records.length,
+    pending:  records.filter(r => r.status === 'pending').length,
+    assigned: records.filter(r => r.status === 'assigned' || r.status === 'investigating').length,
+    verified: records.filter(r => r.status === 'verified' || r.status === 'closed').length,
+  };
 
   return (
-    <div style={{ display: "flex", gap: "20px", marginBottom: "30px" }}>
-      <StatCard title="Total Inventory" value={total} color="#343a40" icon="📊" />
-      <StatCard title="Pending Review" value={pending} color="#ffc107" icon="🟡" />
-      <StatCard title="Active Investigation" value={active} color="#007bff" icon="🔵" />
-      <StatCard title="Forensically Verified" value={verified} color="#28a745" icon="🟢" />
-    </div>
-  );
-}
-
-function StatCard({ title, value, color, icon }) {
-  return (
-    <div style={{
-      flex: 1,
-      padding: "20px",
-      background: "#fff",
-      borderRadius: "12px",
-      boxShadow: "0 2px 10px rgba(0,0,0,0.05)",
-      borderTop: `4px solid ${color}`,
-      transition: "transform 0.2s ease-in-out",
-      cursor: "default"
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-        <h4 style={{ margin: 0, color: '#6c757d', fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          {title}
-        </h4>
-        <span style={{ fontSize: '18px' }}>{icon}</span>
-      </div>
-      <h2 style={{ margin: 0, fontSize: '32px', fontWeight: '800', color: '#212529' }}>{value}</h2>
-      <div style={{ height: '4px', width: '100%', background: '#f8f9fa', borderRadius: '2px', marginTop: '15px' }}>
-        <div style={{ height: '100%', width: value > 0 ? '100%' : '0%', background: color, borderRadius: '2px', transition: 'width 0.5s ease' }}></div>
-      </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+      {STATS.map(({ key, label, icon, color, glow }) => (
+        <div key={key} style={{
+          background: 'var(--surface)',
+          border: `1px solid rgba(255,255,255,0.07)`,
+          borderRadius: 'var(--radius-lg)',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          transition: 'all 0.25s',
+          cursor: 'default',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.boxShadow = `0 0 20px ${glow}`; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.boxShadow = 'none'; }}
+        >
+          {/* Background glow blob */}
+          <div style={{ position: 'absolute', top: -20, right: -20, width: 80, height: 80, borderRadius: '50%', background: glow, filter: 'blur(20px)', pointerEvents: 'none' }} />
+          
+          <div style={{ fontSize: '28px' }}>{icon}</div>
+          <div>
+            <div style={{ fontSize: '32px', fontWeight: 900, color, lineHeight: 1 }}>
+              {counts[key]}
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '4px' }}>
+              {label}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
