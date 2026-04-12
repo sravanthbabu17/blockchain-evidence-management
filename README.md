@@ -24,6 +24,19 @@ graph TD
 
 ---
 
+## ⚡ Quick Start: No Hardware? No Problem!
+**Don't have the ESP32 sensors?** You can still trigger the entire forensic pipeline (Video Capture → IPFS → Blockchain) using a simple API call.
+
+```bash
+# While backend is running, trigger a simulated impact:
+curl -X POST http://localhost:5000/api/impact \
+     -H "Content-Type: application/json" \
+     -d '{"vehicle_id": "SIM_VEHICLE_001"}'
+```
+*The forensic video will appear on your dashboard in ~35 seconds.*
+
+---
+
 ## 📋 Prerequisites
 - **Node.js** (v18.x or higher)
 - **Arduino IDE** (for ESP32 flashing)
@@ -72,33 +85,81 @@ npm install
 npm start
 ```
 
-### 4. ESP32 Sensor Node
-**Hardware Requirements**:
-- ESP32 Development Board
-- MPU6050 Accelerometer
-- NEO-6M GPS Module
+### 4. ESP32 Sensor Node (Hardware Trigger - OPTIONAL)
+> [!TIP]
+> This section is only required if you want to use physical sensors. If you just want to test the software workflow, skip to **[Workflow Triggering](#-workflow-triggering-sensors-step)**.
 
-**Wiring**:
-- **MPU6050**: SDA (GPIO 21), SCL (GPIO 22)
-- **NEO-6M**: TX (GPIO 16), RX (GPIO 17)
+To build the physical forensic sensor, follow these steps:
 
-**Libraries**:
-Install via Arduino Library Manager:
-- `Adafruit MPU6050`
-- `TinyGPSPlus`
-- `ArduinoJson`
+**Hardware Components**:
+- **ESP32 DevKit V1** (30 or 38 pins)
+- **MPU6050** (Accelerometer + Gyroscope)
+- **NEO-6M GPS Module**
+- Breadboard & Jumper Wires
 
-**Configuration**:
-Update `EvidenceChain_Sensor.ino` with your WiFi credentials and `SERVER_URL` (your backend IP).
+**Wiring Diagram**:
+| Component | ESP32 Pin | Note |
+| :--- | :--- | :--- |
+| **MPU6050 VCC** | 3.3V | |
+| **MPU6050 GND** | GND | |
+| **MPU6050 SDA** | GPIO 21 | I2C Data |
+| **MPU6050 SCL** | GPIO 22 | I2C Clock |
+| **NEO-6M VCC** | 3.3V/5V | Check your module's spec |
+| **NEO-6M GND** | GND | |
+| **NEO-6M TX** | GPIO 16 | ESP2 RX2 |
+| **NEO-6M RX** | GPIO 17 | ESP2 TX2 |
+
+**Arduino Setup**:
+1. Open `esp32/EvidenceChain_Sensor/EvidenceChain_Sensor.ino`.
+2. Install dependencies via **Library Manager**:
+   - `Adafruit MPU6050`
+   - `Adafruit Unified Sensor` (Dependency)
+   - `TinyGPSPlus`
+   - `ArduinoJson` (v6.x)
+3. Update `WIFI_SSID`, `WIFI_PASSWORD`, and `SERVER_URL` with your local network details.
+4. Flash the code to your ESP32.
 
 ---
 
-## 🚦 Usage
-1. **Start Backend**: `npm run dev` (in `/backend`).
-2. **Start Frontend**: `npm start` (in `/frontend`).
-3. **Connect Device**: Power up the ESP32. It will monitor for G-force spikes.
-4. **Trigger Accident**: Upon impact (or manual shake), the device sends a report.
-5. **Review Evidence**: Open the dashboard to view the accident map, playback the forensic video, and verify the blockchain integrity.
+## 🚦 Workflow Triggering (Sensors Step)
+You can trigger the evidence collection pipeline in two ways:
+
+### Path A: Physical Hardware (ESP32)
+1. Ensure the backend server is running and accessible from your WiFi.
+2. Power the ESP32 and open the Serial Monitor (115200 baud).
+3. **Shake the sensor** or tap the MPU6050 to simulate an impact.
+4. The ESP32 will detect the G-force spike, capture GPS coordinates, and POST the data to `/api/accident/report`.
+5. The backend will automatically trigger a **35-second forensic video capture** from the dashcam feed.
+
+### Path B: Software Simulation (No Hardware Needed)
+If you don't have the hardware, you can trigger the full forensic workflow using a simple API call.
+
+**Using cURL**:
+```bash
+curl -X POST http://localhost:5000/api/impact \
+     -H "Content-Type: application/json" \
+     -d '{"vehicle_id": "SIM_VEHICLE_001"}'
+```
+
+**Using Postman**:
+- **Method**: `POST`
+- **URL**: `http://localhost:5000/api/impact`
+- **Body** (raw JSON):
+  ```json
+  {
+    "vehicle_id": "SIM_VEHICLE_001"
+  }
+  ```
+
+---
+
+## 🕒 The Forensic Window
+When an impact is triggered:
+1. **Immediate Reaction**: The system marks the current dashcam buffer as a "Forensic Event".
+2. **Buffer Capture**: It captures 15 seconds *before* the impact and continues recording for 20 seconds *after*.
+3. **Processing**: High-speed ffmpeg assembly creates a single `.mp4` file.
+4. **Securing**: The video is hashed, uploaded to IPFS, and anchored to the Sepolia Blockchain.
+5. **Ready**: The video will appear in the dashboard in approximately **35-40 seconds**.
 
 ---
 
