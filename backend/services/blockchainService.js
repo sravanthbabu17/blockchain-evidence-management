@@ -1,47 +1,114 @@
+/**
+ * blockchainService.js — EvidenceChain Blockchain Anchor Layer
+ * -------------------------------------------------------------
+ * Anchors evidence metadata to the AccidentEvidence smart contract
+ * on Ethereum Sepolia Testnet via Alchemy RPC.
+ *
+ * Logs:
+ *   - Gas used          (for paper: Table "Gas Cost per Evidence Record")
+ *   - Block number      (for verification proof)
+ *   - Confirmation time (for paper: Table "Blockchain Confirmation Latency")
+ */
+
+'use strict';
+
 const { ethers } = require('ethers');
 require('dotenv').config();
 
-// Contract details
-const CONTRACT_ADDRESS = "0x6775f902993ab3B4F250189Be85558F09e02b7dc";
+// ── Contract Configuration ────────────────────────────────────────────────────
+const CONTRACT_ADDRESS = process.env.CONTRACT_ADDRESS || '0xd2CFB837a34d9a704df42E87FfEC7E894D4715F4';
 
-// ABI (copy minimal ABI)
+// Full ABI including access-control functions (for completeness)
 const ABI = [
-    "function addEvidenceRecord(string,string,string,uint256)"
+    // Evidence submission (requires authorised node)
+    'function addEvidenceRecord(string,string,string,uint256) external',
+    // Read-only queries
+    'function getTotalRecords() external view returns (uint256)',
+    'function getRecord(uint256) external view returns (string,string,string,uint256,address)',
+    'function verifyCID(string) external view returns (bool,uint256)',
+    // Owner management
+    'function authoriseNode(address) external',
+    'function revokeNode(address) external',
+    // Events
+    'event RecordAdded(uint256 indexed,string,string,string indexed,uint256,address indexed)'
 ];
 
-// Check env variables first
+// ── Provider / Wallet Setup ───────────────────────────────────────────────────
 if (!process.env.ALCHEMY_URL || !process.env.PRIVATE_KEY) {
-    console.error("❌ CRITICAL: ALCHEMY_URL or PRIVATE_KEY missing in .env!");
+    console.error('❌ [BlockchainService] CRITICAL: ALCHEMY_URL or PRIVATE_KEY missing in .env');
 }
 
-// v6 robust initialization
 const provider = new ethers.JsonRpcProvider(process.env.ALCHEMY_URL, {
     name: 'sepolia',
     chainId: 11155111
 });
 
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
-
+const wallet   = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
+// ── Core: Anchor Evidence ─────────────────────────────────────────────────────
+
+/**
+ * Anchor evidence metadata on the blockchain.
+ * @param {object} opts
+ * @param {string} opts.cid        - Real IPFS CID (must not be a local fallback)
+ * @param {string} opts.hash       - SHA-256 hex digest of the JSON payload
+ * @param {string} opts.vehicleId  - Vehicle / device ID
+ * @param {string} opts.timestamp  - ISO 8601 collision timestamp
+ * @returns {{ txHash, blockNumber, gasUsed, confirmationMs }} metrics
+ */
 exports.storeOnBlockchain = async ({ cid, hash, vehicleId, timestamp }) => {
-    try {
-        const tx = await contract.addEvidenceRecord(
-            cid,
-            hash,
-            vehicleId,
-            Math.floor(new Date(timestamp).getTime() / 1000)
-        );
+    const txStart = Date.now();
 
-        await tx.wait();
+    console.log(`⛓️  [BlockchainService] Anchoring evidence for ${vehicleId}...`);
 
-        console.log("⚓ Blockchain Transaction Success! Hash:", tx.hash);
+    const unixTimestamp = Math.floor(new Date(timestamp).getTime() / 1000);
 
-        return tx.hash;
+    const tx = await contract.addEvidenceRecord(cid, hash, vehicleId, unixTimestamp);
 
-    } catch (error) {
-        console.error("❌ Blockchain error:", error.message);
-        if (error.data) console.error("Error data:", error.data);
-        throw error; // Re-throw the original error so we can see its message in the controller
-    }
+    console.log(`⛓️  [BlockchainService] TX submitted: ${tx.hash} — awaiting confirmation...`);
+
+    const receipt = await tx.wait();
+    const confirmationMs = Date.now() - txStart;
+
+    // Extract gas metrics for the research paper
+    const gasUsed = receipt.gasUsed !== undefined
+        ? Number(receipt.gasUsed)
+        : null;
+
+    console.log(`✅ [BlockchainService] Confirmed in block ${receipt.blockNumber}`);
+    console.log(`   TX Hash    : ${tx.hash}`);
+    console.log(`   Gas Used   : ${gasUsed?.toLocaleString() ?? 'N/A'} units`);
+    console.log(`   Conf. Time : ${confirmationMs} ms`);
+
+    return {
+        txHash:         tx.hash,
+        blockNumber:    receipt.blockNumber,
+        gasUsed,
+        confirmationMs,
+    };
+};
+
+/**
+ * Read-only: retrieve a record from the chain (used by verifyController).
+ */
+exports.getRecordFromChain = async (index) => {
+    const [cid, jsonHash, vehicleId, timestamp, uploadedBy] =
+        await contract.getRecord(index);
+    return { cid, jsonHash, vehicleId, timestamp: Number(timestamp), uploadedBy };
+};
+
+/**
+ * Read-only: check whether a CID is already anchored.
+ */
+exports.verifyCID = async (cid) => {
+    const [found, index] = await contract.verifyCID(cid);
+    return { found, index: Number(index) };
+};
+
+/**
+ * Read-only: total number of anchored records.
+ */
+exports.getTotalRecords = async () => {
+    return Number(await contract.getTotalRecords());
 };

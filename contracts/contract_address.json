@@ -1,1 +1,5 @@
-{"address":"0x5FbDB2315678afecb367f032d93F642f64180aa3"}
+{
+  "address": "0xd2CFB837a34d9a704df42E87FfEC7E894D4715F4",
+  "network": "sepolia",
+  "chainId": 11155111
+}

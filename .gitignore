@@ -9,8 +9,12 @@ frontend/.env
 backend/config/serviceAccountKey.json
 backend/config/*.json
 
+# 🔐 ESP32 Hardware Credentials (NEVER commit)
+esp32/EvidenceChain_Sensor/credentials.h
+
 # 💾 Local Data & Forensic Records (not for repo)
 backend/data/records.json
+backend/data/metrics.json
 
 # 🎥 Video & Recording Files (large binary files)
 backend/recording.ts
