@@ -185,6 +185,7 @@ exports.processAccidentData = async (data) => {
 
     // ── 5. Blockchain Anchoring ───────────────────────────────────────────────
     let txHash = null;
+    let blockchainMetrics = null;
     let blockchainStatus = 'skipped';
 
     if (cid) {
@@ -192,7 +193,14 @@ exports.processAccidentData = async (data) => {
         timer.mark('blockchain_start');
         blockchainStatus = 'pending';
         try {
-            txHash = await storeOnBlockchain({ cid, hash, vehicleId: data.vehicle_id, timestamp });
+            const anchorResult = await storeOnBlockchain({ cid, hash, vehicleId: data.vehicle_id, timestamp });
+            txHash = anchorResult.txHash;
+            blockchainMetrics = {
+                gasUsed:     anchorResult.gasUsed,
+                blockNumber: anchorResult.blockNumber,
+                latencyMs:   anchorResult.confirmationMs
+            };
+            
             timer.mark('blockchain_end');
             blockchainStatus = 'confirmed';
             console.log(`⚓ [AccidentService] Blockchain TX: ${txHash}`);
@@ -216,6 +224,7 @@ exports.processAccidentData = async (data) => {
         hash,
         cid:       cid  || null,
         txHash:    txHash || null,
+        blockchain_metrics: blockchainMetrics,
 
         // Explicit storage status flags (never hide failures)
         ipfsStatus,

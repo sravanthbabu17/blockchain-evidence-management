@@ -50,7 +50,7 @@ async function sendAccident(data) {
             headers: { "x-api-key": "device123" }
         });
 
-        console.log("✅ Forensic Record Secured:", response.data.hash);
+        console.log("✅ Forensic Record Secured:", response.data.data?.hash || "Success (Hash in dashboard)");
         console.log("--------------------------------------------------");
 
     } catch (error) {
