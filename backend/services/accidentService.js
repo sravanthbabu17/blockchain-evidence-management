@@ -52,16 +52,37 @@ try {
     records = [];
 }
 
-// Phase 2: Async Firestore sync (cloud overwrites local after ~1-2s)
+// Phase 2: Async Firestore sync (Merges cloud into local to prevent data loss)
 (async () => {
     try {
         const snapshot = await firestoreDb.collection(EVIDENCE_COLLECTION).get();
         if (!snapshot.empty) {
-            records = snapshot.docs.map(doc => doc.data());
-            console.log(`🔥 [AccidentService] Synced ${records.length} records from Firestore (cloud source of truth).`);
+            const cloudRecords = snapshot.docs.map(doc => doc.data());
+            
+            // Smart Merge: We trust cloud for things like 'status' and 'assignedTo',
+            // but we PREFER local for technical forensic fields (like videos) 
+            // that might have been captured recently but not yet synced.
+            cloudRecords.forEach(cr => {
+                const localIdx = records.findIndex(lr => lr.id === cr.id);
+                if (localIdx !== -1) {
+                    // Update existing: Merge cloud status into local record
+                    records[localIdx] = {
+                        ...cr,
+                        // Preserve video evidence if local has it but cloud doesn't
+                        video: records[localIdx].video || cr.video,
+                        // Preserve newer metrics if local has them
+                        metrics: records[localIdx].metrics || cr.metrics
+                    };
+                } else {
+                    // New record from cloud: Add to local
+                    records.push(cr);
+                }
+            });
+
+            console.log(`🔥 [AccidentService] Synced/Merged ${cloudRecords.length} records from Firestore.`);
             _backupToFile();
         } else if (records.length > 0) {
-            // First run: migrate local records → Firestore (one-time operation)
+            // First run: migrate local records → Firestore
             console.log(`📦 [AccidentService] Migrating ${records.length} local records to Firestore...`);
             for (let i = 0; i < records.length; i += 450) {
                 const batch = firestoreDb.batch();
@@ -70,9 +91,7 @@ try {
                 });
                 await batch.commit();
             }
-            console.log(`✅ [AccidentService] Migration complete — ${records.length} records now in Firestore.`);
-        } else {
-            console.log(`📭 [AccidentService] No records found in Firestore or local backup.`);
+            console.log(`✅ [AccidentService] Migration complete.`);
         }
     } catch (err) {
         console.error('⚠️  [AccidentService] Firestore sync failed — using local data:', err.message);

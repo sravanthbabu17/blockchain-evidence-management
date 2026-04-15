@@ -5,4 +5,7 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
+// 🛡️ Robust Firestore Configuration
+admin.firestore().settings({ ignoreUndefinedProperties: true });
+
 module.exports = admin;

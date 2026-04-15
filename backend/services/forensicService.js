@@ -185,6 +185,7 @@ async function _runPipeline(recordId, vehicleId, timestamp) {
 
     if (record) {
         record.video = {
+            local:          `videos/${recordId}_final.mp4`,
             localPath:      `videos/${recordId}_final.mp4`,
             cid:            videoCid,          // null if IPFS failed (honest)
             hash:           videoHash,

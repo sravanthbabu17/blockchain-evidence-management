@@ -361,10 +361,10 @@ export default function CaseDetails({ user }) {
             {/* Video */}
             {data.video && (
               <InfoBox label={data.video.cid ? "Full Incident Evidence (60s)" : "Multi-modal Forensic Evidence"}>
-                {(data.video.local || data.video.cid) ? (
+                {(data.video.local || data.video.localPath || data.video.cid) ? (
                   <video controls width="100%" style={{ borderRadius: '6px', background: '#000', marginTop: 8 }}>
-                    <source src={data.video.local ? `http://localhost:5000/${data.video.local}` : `https://gateway.pinata.cloud/ipfs/${data.video.cid}`}
-                      type={data.video.local?.endsWith('.mp4') ? "video/mp4" : "video/webm"} />
+                    <source src={(data.video.local || data.video.localPath) ? `http://localhost:5000/${data.video.local || data.video.localPath}` : `https://gateway.pinata.cloud/ipfs/${data.video.cid}`}
+                      type="video/mp4" />
                   </video>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
