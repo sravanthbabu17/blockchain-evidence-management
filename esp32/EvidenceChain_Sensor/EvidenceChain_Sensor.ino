@@ -381,14 +381,16 @@ bool getGPSCoords(double &lat, double &lon) {
     return false;
 }
 
+#include <WiFiClientSecure.h>
+
 // ─────────────────────────────────────────────────────────────
-//  HTTP REPORT
+//  HTTP REPORT (Secure via HTTPS)
 // ─────────────────────────────────────────────────────────────
 bool sendReport(float ax, float ay, float az,
                 float magnitude, float jerk, float staltaRatio,
                 double lat, double lon, bool hasFix) {
 
-    Serial.println("   📤 Sending collision report to backend...");
+    Serial.println("   🔐 Sending SECURE collision report to backend (HTTPS)...");
 
     StaticJsonDocument<512> doc;
     doc["vehicle_id"] = VEHICLE_ID;
@@ -438,12 +440,15 @@ bool sendReport(float ax, float ay, float az,
     serializeJson(doc, payload);
     Serial.println("   Payload: " + payload);
 
-    // ── HTTP POST ─────────────────────────────────────────────
+    // ── HTTPS POST Setup ──────────────────────────────────────
+    WiFiClientSecure client;
+    client.setInsecure(); // Required for self-signed certificates
+    
     HTTPClient http;
-    http.begin(SERVER_URL);
+    http.begin(client, SERVER_URL); // Use HTTPS client
     http.addHeader("Content-Type", "application/json");
     http.addHeader("x-api-key", API_KEY);
-    http.setTimeout(8000);
+    http.setTimeout(10000);
 
     int httpCode = http.POST(payload);
 
@@ -453,7 +458,7 @@ bool sendReport(float ax, float ay, float az,
         http.end();
         return true;
     } else {
-        Serial.printf("   ❌ HTTP Error: %s\n", http.errorToString(httpCode).c_str());
+        Serial.printf("   ❌ HTTPS Error: %s\n", http.errorToString(httpCode).c_str());
         http.end();
         return false;
     }
