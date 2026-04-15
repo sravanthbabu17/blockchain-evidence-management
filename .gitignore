@@ -8,6 +8,7 @@ backend/.env
 frontend/.env
 backend/config/serviceAccountKey.json
 backend/config/*.json
+backend/certs/
 
 # 🔐 ESP32 Hardware Credentials (NEVER commit)
 esp32/EvidenceChain_Sensor/credentials.h

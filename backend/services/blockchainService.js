@@ -38,9 +38,18 @@ if (!process.env.ALCHEMY_URL || !process.env.PRIVATE_KEY) {
     console.error('❌ [BlockchainService] CRITICAL: ALCHEMY_URL or PRIVATE_KEY missing in .env');
 }
 
+const NETWORK_NAME = process.env.NETWORK_NAME || 'sepolia';
+const CHAIN_ID     = parseInt(process.env.CHAIN_ID || '11155111', 10);
+const NETWORK_MODE = process.env.NETWORK_MODE || 'testnet';
+
+console.log(`⛓️  [BlockchainService] Network: ${NETWORK_NAME} (ID: ${CHAIN_ID}) [Mode: ${NETWORK_MODE}]`);
+if (NETWORK_MODE === 'testnet') {
+    console.warn('⚠️  [BlockchainService] INFO: Operating on testnet for prototyping.');
+}
+
 const provider = new ethers.JsonRpcProvider(process.env.ALCHEMY_URL, {
-    name: 'sepolia',
-    chainId: 11155111
+    name: NETWORK_NAME,
+    chainId: CHAIN_ID
 });
 
 const wallet   = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
