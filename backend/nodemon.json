@@ -1,0 +1,9 @@
+{
+  "ignore": [
+    "data/*",
+    "videos/*",
+    "recording.ts",
+    "node_modules/*"
+  ],
+  "delay": "2500"
+}

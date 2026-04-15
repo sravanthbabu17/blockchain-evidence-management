@@ -31,28 +31,76 @@ const getForensicService = () => {
     return forensicService;
 };
 
-// ── Persistence ──────────────────────────────────────────────────────────────
-const DATA_FILE = path.join(__dirname, '../data/records.json');
+// ── Persistence (Firestore + Local Backup) ───────────────────────────────────
+// Source of truth: Firebase Firestore (cloud, ACID-compliant)
+// Fallback:        Local JSON file   (instant startup cache)
+const admin           = require('../config/firebaseAdmin');
+const firestoreDb     = admin.firestore();
+const EVIDENCE_COLLECTION = 'evidence_records';
+
+const BACKUP_FILE = path.join(__dirname, '../data/records.json');
 let records = [];
 
+// Phase 1: Synchronous load from local backup (instant startup — no async wait)
 try {
-    if (fs.existsSync(DATA_FILE)) {
-        records = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-        console.log(`💾 [AccidentService] Loaded ${records.length} persisted records.`);
+    if (fs.existsSync(BACKUP_FILE)) {
+        records = JSON.parse(fs.readFileSync(BACKUP_FILE, 'utf8'));
+        console.log(`💾 [AccidentService] Quick-loaded ${records.length} records from local backup.`);
     }
 } catch (err) {
-    console.error('❌ [AccidentService] Failed to load persisted data:', err.message);
+    console.error('❌ [AccidentService] Local backup load failed:', err.message);
     records = [];
 }
 
-const saveToFile = () => {
+// Phase 2: Async Firestore sync (cloud overwrites local after ~1-2s)
+(async () => {
     try {
-        const dir = path.dirname(DATA_FILE);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(DATA_FILE, JSON.stringify(records, null, 2));
+        const snapshot = await firestoreDb.collection(EVIDENCE_COLLECTION).get();
+        if (!snapshot.empty) {
+            records = snapshot.docs.map(doc => doc.data());
+            console.log(`🔥 [AccidentService] Synced ${records.length} records from Firestore (cloud source of truth).`);
+            _backupToFile();
+        } else if (records.length > 0) {
+            // First run: migrate local records → Firestore (one-time operation)
+            console.log(`📦 [AccidentService] Migrating ${records.length} local records to Firestore...`);
+            for (let i = 0; i < records.length; i += 450) {
+                const batch = firestoreDb.batch();
+                records.slice(i, i + 450).forEach(r => {
+                    batch.set(firestoreDb.collection(EVIDENCE_COLLECTION).doc(r.id), r);
+                });
+                await batch.commit();
+            }
+            console.log(`✅ [AccidentService] Migration complete — ${records.length} records now in Firestore.`);
+        } else {
+            console.log(`📭 [AccidentService] No records found in Firestore or local backup.`);
+        }
     } catch (err) {
-        console.error('❌ [AccidentService] Persistence error:', err.message);
+        console.error('⚠️  [AccidentService] Firestore sync failed — using local data:', err.message);
     }
+})();
+
+// Local JSON backup (sync, fast)
+const _backupToFile = () => {
+    try {
+        const dir = path.dirname(BACKUP_FILE);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(BACKUP_FILE, JSON.stringify(records, null, 2));
+    } catch (err) {
+        console.error('❌ [AccidentService] Local backup error:', err.message);
+    }
+};
+
+// Dual-write: Local backup (sync) + Firestore (async, fire-and-forget)
+const saveToFile = () => {
+    _backupToFile();
+    // Batch-sync all records to Firestore (non-blocking)
+    const batch = firestoreDb.batch();
+    records.forEach(r => {
+        batch.set(firestoreDb.collection(EVIDENCE_COLLECTION).doc(r.id), r, { merge: true });
+    });
+    batch.commit().catch(err => {
+        console.error('❌ [AccidentService] Firestore sync error:', err.message);
+    });
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
