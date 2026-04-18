@@ -1,13 +1,15 @@
 /**
- * accidentService.js — EvidenceChain Forensic Processing Service
- * ---------------------------------------------------------------
+ * accidentService.js — EvidenceChain Forensic Processing Service v2.0
+ * --------------------------------------------------------------------
  * Core forensic pipeline:
  *   1. Validate incoming sensor data
  *   2. SHA-256 hash of stable-sorted JSON payload
- *   3. Upload JSON evidence to IPFS (Pinata)
- *   4. Anchor hash + CID on Ethereum (Sepolia)
- *   5. Persist record with full latency metrics
- *   6. Trigger autonomous video capture (fire-and-forget)
+ *   3. Upload JSON evidence to IPFS (multi-pin strategy)
+ *   4. ECDSA sign evidence digest
+ *   5. Anchor hash + CID + signature on Ethereum (Sepolia)
+ *   6. Auto-log chain-of-custody "Created" event
+ *   7. Persist record with full latency metrics
+ *   8. Trigger autonomous video capture (fire-and-forget)
  *
  * Research integrity rules (DO NOT remove):
  *   - NEVER anchor a fake/local CID on the blockchain.
@@ -18,8 +20,8 @@
 'use strict';
 
 const { generateHash }  = require('../utils/hashUtil');
-const { uploadJSONToIPFS } = require('./ipfsService');
-const { storeOnBlockchain } = require('./blockchainService');
+const { uploadJSONToIPFS, uploadJSONToIPFSDetailed } = require('./ipfsService');
+const { storeOnBlockchain, logCustodyEvent: chainLogCustody } = require('./blockchainService');
 const metricsLogger     = require('../utils/metricsLogger');
 const fs   = require('fs');
 const path = require('path');
@@ -175,7 +177,10 @@ exports.processAccidentData = async (data) => {
     // ── 2. Build evidence payload ────────────────────────────────────────────
     const evidenceData = {
         ...data,
-        gps_valid: gpsValid,      // Explicitly flag GPS quality for verifiers
+        gps_valid: gpsValid,
+        gps_source: data.gps?.source || (gpsValid ? 'live_fix' : 'unavailable'),
+        gps_confidence: data.gps?.confidence || (gpsValid ? 'high' : 'none'),
+        impact_direction: data.impact_direction || null,
         pipeline_start_iso: new Date(pipelineStart).toISOString()
     };
 
@@ -186,34 +191,49 @@ exports.processAccidentData = async (data) => {
     timer.mark('hash_end');
     console.log(`🔒 [AccidentService] SHA-256: ${hash}`);
 
-    // ── 4. IPFS Upload (JSON metadata) ───────────────────────────────────────
+    // ── 4. IPFS Upload (multi-pin strategy) ──────────────────────────────────
     let cid = null;
     let ipfsStatus = 'success';
+    let ipfsDetails = null;
 
     timer.mark('ipfs_json_start');
     try {
-        cid = await uploadJSONToIPFS(evidenceData);
+        const ipfsResult = await uploadJSONToIPFSDetailed(evidenceData);
+        cid = ipfsResult.cid;
+        ipfsDetails = {
+            providerResults: ipfsResult.providerResults,
+            cidConsistent: ipfsResult.cidConsistent,
+            totalLatencyMs: ipfsResult.totalLatencyMs,
+        };
         timer.mark('ipfs_json_end');
         console.log(`📤 [AccidentService] IPFS JSON CID: ${cid}`);
+        if (!ipfsResult.cidConsistent) {
+            console.error('🚨 [AccidentService] CID MISMATCH across IPFS providers!');
+        }
     } catch (e) {
         timer.mark('ipfs_json_end');
         ipfsStatus = 'failed';
-        cid = null;   // ← NEVER fabricate a local-XXXX CID
+        cid = null;
         console.error('❌ [AccidentService] IPFS upload failed:', e.message);
     }
 
-    // ── 5. Blockchain Anchoring ───────────────────────────────────────────────
+    // ── 5. Blockchain Anchoring (with ECDSA signature) ───────────────────────
     let txHash = null;
     let blockchainMetrics = null;
     let blockchainStatus = 'skipped';
+    let signatureData = null;
 
     if (cid) {
-        // Only anchor when we have a REAL IPFS CID
         timer.mark('blockchain_start');
         blockchainStatus = 'pending';
         try {
             const anchorResult = await storeOnBlockchain({ cid, hash, vehicleId: data.vehicle_id, timestamp });
             txHash = anchorResult.txHash;
+            signatureData = {
+                signature: anchorResult.signature,
+                signerAddress: anchorResult.signerAddress,
+                isDuplicate: anchorResult.isDuplicate,
+            };
             blockchainMetrics = {
                 gasUsed:     anchorResult.gasUsed,
                 blockNumber: anchorResult.blockNumber,
@@ -226,7 +246,7 @@ exports.processAccidentData = async (data) => {
         } catch (e) {
             timer.mark('blockchain_end');
             blockchainStatus = 'failed';
-            txHash = null;   // ← NEVER fabricate a mock 0x-mock-tx hash
+            txHash = null;
             console.error('❌ [AccidentService] Blockchain anchor failed:', e.message);
         }
     } else {
@@ -245,10 +265,21 @@ exports.processAccidentData = async (data) => {
         txHash:    txHash || null,
         blockchain_metrics: blockchainMetrics,
 
+        // ECDSA signature (non-repudiation)
+        signature: signatureData,
+
+        // IPFS multi-pin details
+        ipfsDetails,
+
         // Explicit storage status flags (never hide failures)
         ipfsStatus,
         blockchainStatus,
         gpsValid,
+        gpsSource: evidenceData.gps_source,
+        gpsConfidence: evidenceData.gps_confidence,
+
+        // Impact direction (from ESP32 gyro fusion)
+        impactDirection: data.impact_direction || null,
 
         timestamp,
         evidenceData,
@@ -264,7 +295,8 @@ exports.processAccidentData = async (data) => {
             action: 'Case Created',
             by:     'System (Forensic Enclave)',
             time:   new Date().toISOString(),
-            stages: { ipfsStatus, blockchainStatus }
+            stages: { ipfsStatus, blockchainStatus },
+            signature: signatureData ? signatureData.signerAddress : null,
         }],
 
         // Latency metrics (populated after finalise())
@@ -277,7 +309,7 @@ exports.processAccidentData = async (data) => {
     // ── 7. Finalise latency trace ─────────────────────────────────────────────
     const traceResult = timer.finalise();
     finalRecord.metrics = traceResult.durations;
-    saveToFile(); // Save again with metrics
+    saveToFile();
 
     console.log(`📦 [AccidentService] Case ${recordId} secured. IPFS:${ipfsStatus} Chain:${blockchainStatus}`);
 
@@ -290,6 +322,25 @@ exports.processAccidentData = async (data) => {
     }
 
     return finalRecord;
+};
+
+// ── Custody Actions ───────────────────────────────────────────────────────────
+
+/**
+ * Log a custody action for a record (updates local timeline + optional on-chain).
+ */
+exports.logCustodyAction = (recordId, action, detail, actor) => {
+    const record = records.find(r => r.id === recordId);
+    if (!record) throw new Error('Case not found');
+
+    record.timeline.push({
+        action,
+        by: actor || 'System',
+        time: new Date().toISOString(),
+        detail
+    });
+    saveToFile();
+    return record;
 };
 
 // ── CRUD helpers ──────────────────────────────────────────────────────────────

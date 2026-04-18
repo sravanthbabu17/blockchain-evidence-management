@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import API from '../services/api';
 import StatusBadge from './StatusBadge';
+import SignatureBadge from './SignatureBadge';
 
 /* ── Header banner config per status ────────────────────────────────── */
 const STATUS_META = {
@@ -165,6 +166,35 @@ export default function CaseCard({ record, role, investigators = [] }) {
           <CopyPill label="IPFS" value={cid}     href={cid     ? `https://gateway.pinata.cloud/ipfs/${cid}` : null} />
           <CopyPill label="TX"   value={txHash}  href={txHash  ? `${etherscanBase}${txHash}`  : null} />
           {videoTx && <CopyPill label="VID TX" value={videoTx} href={`${etherscanBase}${videoTx}`} />}
+        </div>
+
+        {/* v2.0 badges: signature, impact direction, GPS source */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '14px' }}>
+          <SignatureBadge signature={record.signature} compact />
+          {record.impactDirection && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '3px',
+              fontSize: '10px', color: '#8b5cf6',
+              background: '#8b5cf615', padding: '2px 8px',
+              borderRadius: '20px', border: '1px solid #8b5cf630',
+            }}>
+              {record.impactDirection === 'FRONT' ? '↑' : record.impactDirection === 'REAR' ? '↓' :
+               record.impactDirection === 'LEFT' ? '←' : record.impactDirection === 'RIGHT' ? '→' :
+               record.impactDirection === 'ROLLOVER' ? '↻' : '↕'}
+              {' '}{record.impactDirection}
+            </span>
+          )}
+          {record.gpsSource && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px',
+              color: record.gpsSource === 'live_fix' ? '#10b981' : record.gpsSource === 'last_known' ? '#f59e0b' : '#ef4444',
+              background: record.gpsSource === 'live_fix' ? '#10b98115' : record.gpsSource === 'last_known' ? '#f59e0b15' : '#ef444415',
+              padding: '2px 8px', borderRadius: '20px',
+              border: `1px solid ${record.gpsSource === 'live_fix' ? '#10b98130' : record.gpsSource === 'last_known' ? '#f59e0b30' : '#ef444430'}`,
+            }}>
+              📍 {record.gpsSource.replace('_', ' ')}
+            </span>
+          )}
         </div>
 
         {/* Mini timeline */}

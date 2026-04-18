@@ -23,6 +23,9 @@ exports.handleAccidentData = async (req, res, next) => {
         if (!data || Object.keys(data).length === 0) {
             return res.status(400).json({ success: false, message: 'No data received' });
         }
+        if (!data.vehicle_id || typeof data.vehicle_id !== 'string' || !/^[A-Za-z0-9_-]{3,40}$/.test(data.vehicle_id)) {
+            return res.status(400).json({ success: false, message: 'A valid vehicle_id is required' });
+        }
         
         console.log("⚡ Processing Incoming Sensor Report (Legacy)...");
         const result = await accidentService.processAccidentData(data);
@@ -51,6 +54,7 @@ exports.getAllAccidents = (req, res) => {
         }
 
         const { email, role, vehicle_id } = req.user;
+        console.log(`🔍 [AccidentController] Fetching records for: ${email} | Role: ${role}`);
 
         if (!role) {
             return res.status(401).json({ success: false, message: 'Unauthorized: Identity Role Missing in Firestore' });
@@ -72,6 +76,7 @@ exports.getAllAccidents = (req, res) => {
             return res.status(403).json({ success: false, message: 'Access denied: Invalid Role' });
         }
 
+        console.log(`✅ [AccidentController] Returning ${data.length} records.`);
         res.status(200).json({ success: true, data });
 
     } catch (error) {
@@ -97,6 +102,13 @@ exports.getAccidentById = (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
+};
+
+const canMutateRecord = (user, record) => {
+    if (!user || !record) return false;
+    if (user.role === "admin") return true;
+    if (user.role === "investigator" && record.assignedTo === user.email) return true;
+    return false;
 };
 
 // 🛡️ Admin Assign Case (POST /assign/:id)
@@ -126,9 +138,23 @@ exports.updateStatus = (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
+        const allowedStatuses = new Set(['pending', 'assigned', 'investigating', 'verified', 'closed', 'tampered']);
 
         if (!status) {
             return res.status(400).json({ success: false, message: 'Status is required' });
+        }
+
+        if (!allowedStatuses.has(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid status value' });
+        }
+
+        const existing = accidentService.getAllRecords().find(r => r.id === id);
+        if (!existing) {
+            return res.status(404).json({ success: false, message: 'Case not found' });
+        }
+
+        if (!canMutateRecord(req.user, existing)) {
+            return res.status(403).json({ success: false, message: 'Only admins or the assigned investigator can update this case' });
         }
 
         const record = accidentService.updateStatus(id, status);

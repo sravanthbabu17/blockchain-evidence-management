@@ -3,11 +3,11 @@ const admin = require("../config/firebaseAdmin");
 const verifyFirebaseToken = async (req, res, next) => {
   const header = req.headers.authorization;
 
-  if (!header) {
+  if (!header && !req.query.token) {
     return res.status(401).json({ success: false, message: "No token provided" });
   }
 
-  const token = header.split(" ")[1];
+  const token = header ? header.split(" ")[1] : req.query.token;
 
   try {
     const decoded = await admin.auth().verifyIdToken(token);

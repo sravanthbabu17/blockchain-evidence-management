@@ -56,8 +56,6 @@ function StatCard({ value, label, color, glow, icon }) {
 export default function StatsBar({ records }) {
   const total      = records.length;
   const pending    = records.filter(r => r.status === 'pending').length;
-  const assigned   = records.filter(r => r.status === 'assigned').length;
-  const verified   = records.filter(r => r.status === 'verified').length;
   const confirmed  = records.filter(r => r.txHash && typeof r.txHash === 'string' && !r.txHash.includes('mock')).length;
   const withVideo  = records.filter(r => r.video?.cid).length;
 

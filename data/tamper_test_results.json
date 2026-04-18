@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-04-17T06:38:34.221Z",
+  "results": [
+    {
+      "test": "(a) Unmodified payload → hash match",
+      "pass": true,
+      "detail": "Hash: 01a6ea8bedf84029... MATCH"
+    },
+    {
+      "test": "(b) 1-bit flip in accel.x → hash mismatch",
+      "pass": true,
+      "detail": "TAMPER DETECTED — original: 01a6ea8bedf8... tampered: ae17dfc20a35..."
+    },
+    {
+      "test": "(c) Metadata-only mod (vehicle_id change) → hash mismatch",
+      "pass": true,
+      "detail": "TAMPER DETECTED"
+    },
+    {
+      "test": "(d) Replay — same hash submitted twice → detectable",
+      "pass": true,
+      "detail": "REPLAY DETECTED — DuplicateHashWarning would be emitted on-chain"
+    },
+    {
+      "test": "(e) Invalid signature → rejection",
+      "pass": true,
+      "detail": "INVALID SIGNATURE — on-chain require(recovered == msg.sender) would revert"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "total": 5
+  }
+}

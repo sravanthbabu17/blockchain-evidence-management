@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 
 export default function Filters({ onFilter }) {
   const [search, setSearch] = useState('');
+  const [sort, setSort]     = useState('newest');
   const [status, setStatus] = useState('all');
 
-  const handle = (newSearch, newStatus) => {
-    onFilter({ search: newSearch, status: newStatus });
+  const handle = (newSearch, newStatus, newSort) => {
+    onFilter({ search: newSearch, status: newStatus, sort: newSort });
   };
 
   return (
@@ -14,12 +15,12 @@ export default function Filters({ onFilter }) {
         type="text"
         placeholder="🔍  Search by vehicle ID..."
         value={search}
-        onChange={e => { setSearch(e.target.value); handle(e.target.value, status); }}
+        onChange={e => { setSearch(e.target.value); handle(e.target.value, status, sort); }}
         style={{ flex: '1', minWidth: '200px', maxWidth: '320px' }}
       />
       <select
         value={status}
-        onChange={e => { setStatus(e.target.value); handle(search, e.target.value); }}
+        onChange={e => { setStatus(e.target.value); handle(search, e.target.value, sort); }}
         style={{ minWidth: '160px' }}
       >
         <option value="all">All Statuses</option>
@@ -29,10 +30,18 @@ export default function Filters({ onFilter }) {
         <option value="verified">✅ Verified</option>
         <option value="closed">⚫ Closed</option>
       </select>
-      {(search || status !== 'all') && (
+      <select
+        value={sort}
+        onChange={e => { setSort(e.target.value); handle(search, status, e.target.value); }}
+        style={{ minWidth: '160px' }}
+      >
+        <option value="newest">🕒 Newest First</option>
+        <option value="oldest">⌛ Oldest First</option>
+      </select>
+      {(search || status !== 'all' || sort !== 'newest') && (
         <button
           className="btn-ghost"
-          onClick={() => { setSearch(''); setStatus('all'); handle('', 'all'); }}
+          onClick={() => { setSearch(''); setStatus('all'); setSort('newest'); handle('', 'all', 'newest'); }}
         >
           ✕ Clear
         </button>

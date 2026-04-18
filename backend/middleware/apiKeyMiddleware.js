@@ -1,8 +1,24 @@
-const VALID_API_KEYS = [
-    "device123",   // you can add multiple later
-    "vehicle001",
-    "SECURE_IOT_KEY_2026"
-];
+const crypto = require('crypto');
+
+const parseKeys = () => {
+    const raw = process.env.IOT_API_KEYS || process.env.IOT_API_KEY || '';
+    return raw
+        .split(',')
+        .map(k => k.trim())
+        .filter(Boolean);
+};
+
+const VALID_API_KEYS = parseKeys();
+
+if (VALID_API_KEYS.length === 0) {
+    console.error('[API Key] No IOT_API_KEYS configured. Device ingestion routes will reject all requests.');
+}
+
+const safeEqual = (a, b) => {
+    const left = Buffer.from(String(a || ''), 'utf8');
+    const right = Buffer.from(String(b || ''), 'utf8');
+    return left.length === right.length && crypto.timingSafeEqual(left, right);
+};
 
 module.exports = (req, res, next) => {
     try {
@@ -15,7 +31,7 @@ module.exports = (req, res, next) => {
             });
         }
 
-        if (!VALID_API_KEYS.includes(apiKey)) {
+        if (!VALID_API_KEYS.some(validKey => safeEqual(apiKey, validKey))) {
             return res.status(403).json({
                 success: false,
                 message: "Invalid API key"

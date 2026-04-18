@@ -1,0 +1,9 @@
+Function,Description,Gas Used,Ethereum Mainnet (USD),Sepolia Testnet (USD),Polygon PoS (USD),Arbitrum One (USD),Optimism (USD)
+deploy,"Contract deployment",2100000,168.0000,0.0000,0.0473,0.6720,0.3360
+addEvidenceRecord,"Submit evidence with ECDSA signature",406821,32.5457,0.0000,0.0092,0.1302,0.0651
+logCustodyEvent,"Log custody action (event + state)",31400,2.5120,0.0000,0.0007,0.0100,0.0050
+transferCustody,"Transfer custody to new custodian",56091,4.4873,0.0000,0.0013,0.0179,0.0090
+grantRole,"Grant RBAC role",48448,3.8758,0.0000,0.0011,0.0155,0.0078
+revokeRole,"Revoke RBAC role",28000,2.2400,0.0000,0.0006,0.0090,0.0045
+verifyCID,"On-chain CID verification (view)",35000,2.8000,0.0000,0.0008,0.0112,0.0056
+verifySignature,"Re-verify stored signature (view)",30000,2.4000,0.0000,0.0007,0.0096,0.0048

@@ -6,7 +6,7 @@
  * This avoids CORS issues with public RPC endpoints.
  */
 
-const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+import { API_BASE_URL } from './api';
 
 /**
  * Find an on-chain record by its IPFS CID.
@@ -18,7 +18,7 @@ const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
  */
 export async function findByCID(cid, onProgress) {
     const encoded = encodeURIComponent(cid.trim());
-    const res = await fetch(`${BACKEND_URL}/api/verify/${encoded}`);
+    const res = await fetch(`${API_BASE_URL}/api/verify/${encoded}`);
 
     if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));

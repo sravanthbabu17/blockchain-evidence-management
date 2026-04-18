@@ -154,10 +154,11 @@ async function _runPipeline(recordId, vehicleId, timestamp) {
     }
     timer.mark('ipfs_video_end');
 
-    // ── Step 7 : Blockchain anchor (only for real IPFS CID) ──────────────────
+    // ── Step 7 : Blockchain anchor with ECDSA signature (only for real CID) ──
     let videoTxHash         = null;
     let videoBlockchainStatus = 'skipped_no_cid';
     let videoAnchorMeta     = null;
+    let videoSignature      = null;
 
     if (videoCid) {
         try {
@@ -168,6 +169,7 @@ async function _runPipeline(recordId, vehicleId, timestamp) {
                 timestamp
             });
             videoTxHash            = videoAnchorMeta.txHash;
+            videoSignature         = videoAnchorMeta.signature || null;
             videoBlockchainStatus  = 'confirmed';
             console.log(`⚓ [ForensicService] Video TX: ${videoTxHash}`);
         } catch (e) {
@@ -190,6 +192,9 @@ async function _runPipeline(recordId, vehicleId, timestamp) {
             cid:            videoCid,          // null if IPFS failed (honest)
             hash:           videoHash,
             txHash:         videoTxHash,       // null if chain failed (honest)
+            signature:      videoSignature,    // ECDSA signature (non-repudiation)
+            signerAddress:  videoAnchorMeta?.signerAddress ?? null,
+            isDuplicate:    videoAnchorMeta?.isDuplicate ?? false,
             ipfsStatus:     videoIpfsStatus,
             blockchainStatus: videoBlockchainStatus,
             gasUsed:        videoAnchorMeta?.gasUsed    ?? null,

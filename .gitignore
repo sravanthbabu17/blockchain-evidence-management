@@ -6,6 +6,9 @@ node_modules/
 .env.*
 backend/.env
 frontend/.env
+!.env.example
+!backend/.env.example
+!frontend/.env.example
 backend/config/serviceAccountKey.json
 backend/config/*.json
 backend/certs/

@@ -81,7 +81,6 @@ export default function Signup({ onSignup, onLoginToggle }) {
             <select value={role} onChange={e => setRole(e.target.value)} className="input-accented" style={{ width: '100%' }}>
               <option value="investigator">🕵️ Investigator</option>
               <option value="owner">🚗 Vehicle Owner</option>
-              <option value="admin">🛡️ Admin</option>
             </select>
           </div>
           {role === 'owner' && (

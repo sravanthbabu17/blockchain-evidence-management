@@ -9,8 +9,8 @@ const forensicService = require("../services/forensicService");
 exports.handleImpact = async (req, res) => {
   const { vehicle_id } = req.body;
 
-  if (!vehicle_id) {
-    return res.status(400).json({ success: false, message: "vehicle_id is required." });
+  if (!vehicle_id || typeof vehicle_id !== "string" || !/^[A-Za-z0-9_-]{3,40}$/.test(vehicle_id)) {
+    return res.status(400).json({ success: false, message: "A valid vehicle_id is required." });
   }
 
   const timestamp = new Date().toISOString();

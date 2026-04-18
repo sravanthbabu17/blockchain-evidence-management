@@ -32,9 +32,10 @@
  *      // credentials.h
  *      #define WIFI_SSID       "YourNetworkName"
  *      #define WIFI_PASSWORD   "YourPassword"
- *      #define SERVER_URL      "http://192.168.x.x:5000/api/accident/report"
+ *      #define SERVER_URL      "https://192.168.x.x:5443/api/accident/report"
  *      #define API_KEY         "YourSecureApiKey"
  *      #define VEHICLE_ID      "YourVehicleReg"
+ *      #define BACKEND_ROOT_CA  "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"
  *
  *  COLLISION DETECTION ALGORITHM:
  *  --------------------------------
@@ -130,6 +131,14 @@ unsigned long prevSampleTime = 0;
 uint32_t sampleCount     = 0;
 uint32_t falsePositives  = 0;   // incremented when STA/LTA > thresh but jerk < thresh
 
+// ── Gyroscope state (for impact direction classification) ──────
+float lastGyroX = 0.0f, lastGyroY = 0.0f, lastGyroZ = 0.0f;
+
+// ── GPS source tracking ───────────────────────────────────────
+unsigned long lastFixTime = 0;
+const char* gpsSourceStr  = "unavailable";
+const char* gpsConfidence = "none";
+
 // ─────────────────────────────────────────────────────────────
 //  SETUP
 // ─────────────────────────────────────────────────────────────
@@ -186,6 +195,11 @@ void loop() {
     float ay = accel.acceleration.y;
     float az = accel.acceleration.z;
     float magnitude = sqrtf(ax*ax + ay*ay + az*az);
+
+    // Store gyro readings for impact direction classification
+    lastGyroX = gyro.gyro.x;
+    lastGyroY = gyro.gyro.y;
+    lastGyroZ = gyro.gyro.z;
 
     unsigned long now = millis();
     sampleCount++;
@@ -245,14 +259,18 @@ void loop() {
             bool hasFix = getGPSCoords(reportLat, reportLon);
 
             if (hasFix) {
-                Serial.printf("   GPS Fix: %.6f, %.6f\n", reportLat, reportLon);
+                Serial.printf("   GPS Fix: %.6f, %.6f [%s/%s]\n", reportLat, reportLon, gpsSourceStr, gpsConfidence);
             } else {
                 Serial.println("   GPS: No valid fix — GPS will be flagged on server.");
             }
 
+            // Classify impact direction from acceleration vector
+            const char* impactDir = classifyImpactDirection(ax, ay, az);
+            Serial.printf("   Impact Direction: %s\n", impactDir);
+
             if (wifiConnected || reconnectWiFi()) {
                 bool sent = sendReport(ax, ay, az, magnitude, jerk, staltaRatio,
-                                       reportLat, reportLon, hasFix);
+                                       reportLat, reportLon, hasFix, impactDir);
                 if (sent) {
                     lastReportTime = now;
                     Serial.printf("   ⏳ Cooldown: %lu s\n", COOLDOWN_MS / 1000);
@@ -360,24 +378,58 @@ void feedGPS() {
 }
 
 /**
- * Return the best available GPS coordinates.
- * Returns false if no valid fix — the backend will flag gps_valid=false
- * and will NOT anchor (0,0) coordinates on the blockchain.
+ * Classify impact direction from raw acceleration vector.
+ * Uses dominant axis after subtracting gravity (Z-axis bias).
+ */
+const char* classifyImpactDirection(float ax, float ay, float az) {
+    // Subtract gravity from Z-axis (sensor mounted flat)
+    float corrZ = az - 9.8f;
+    float absX = fabsf(ax), absY = fabsf(ay), absZ = fabsf(corrZ);
+
+    if (absX >= absY && absX >= absZ) {
+        return ax > 0 ? "RIGHT" : "LEFT";
+    } else if (absY >= absX && absY >= absZ) {
+        return ay > 0 ? "FRONT" : "REAR";
+    } else {
+        return corrZ > 0 ? "TOP" : "ROLLOVER";
+    }
+}
+
+/**
+ * Return the best available GPS coordinates with source tracking.
+ * Updates gpsSourceStr and gpsConfidence globals for the JSON payload.
  */
 bool getGPSCoords(double &lat, double &lon) {
+    // Priority 1: Live fix (age < 5s)
     if (gps.location.isValid() && gps.location.age() < GPS_MAX_AGE_MS) {
         lat = gps.location.lat();
         lon = gps.location.lng();
+        lastFixTime   = millis();
+        gpsSourceStr  = "live_fix";
+        gpsConfidence = "high";
         return true;
     }
+    // Priority 2: Recent fix (age < 60s)
+    if (hasEverHadFix && (millis() - lastFixTime) < 60000UL) {
+        lat = lastLat;
+        lon = lastLon;
+        gpsSourceStr  = "last_known";
+        gpsConfidence = "medium";
+        return false;
+    }
+    // Priority 3: Stale fix (> 60s old but exists)
     if (hasEverHadFix) {
         lat = lastLat;
         lon = lastLon;
-        return false;  // Stale, but better than nothing
+        gpsSourceStr  = "dead_reckoning";
+        gpsConfidence = "low";
+        return false;
     }
-    // No fix at all — return NaN to signal invalid to the backend
+    // Priority 4: No fix ever
     lat = NAN;
     lon = NAN;
+    gpsSourceStr  = "unavailable";
+    gpsConfidence = "none";
     return false;
 }
 
@@ -388,14 +440,16 @@ bool getGPSCoords(double &lat, double &lon) {
 // ─────────────────────────────────────────────────────────────
 bool sendReport(float ax, float ay, float az,
                 float magnitude, float jerk, float staltaRatio,
-                double lat, double lon, bool hasFix) {
+                double lat, double lon, bool hasFix,
+                const char* impactDir) {
 
     Serial.println("   🔐 Sending SECURE collision report to backend (HTTPS)...");
 
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<768> doc;
     doc["vehicle_id"] = VEHICLE_ID;
     doc["impact"]     = true;
     doc["type"]       = "ESP32_COLLISION";
+    doc["impact_direction"] = impactDir;
 
     // ── Accelerometer telemetry ───────────────────────────────
     JsonObject accelObj = doc.createNestedObject("accel");
@@ -413,15 +467,23 @@ bool sendReport(float ax, float ay, float az,
     detectionObj["lta_window"]  = LTA_WINDOW;
     detectionObj["sample_rate_hz"] = 5;
 
-    // ── GPS ───────────────────────────────────────────────────
+    // ── GPS (with source tracking for research paper) ─────────
     JsonObject gpsObj = doc.createNestedObject("gps");
     if (!isnan(lat) && !isnan(lon)) {
         gpsObj["lat"] = lat;
         gpsObj["lon"] = lon;
     }
     gpsObj["fix"]        = hasFix;
+    gpsObj["source"]     = gpsSourceStr;
+    gpsObj["confidence"] = gpsConfidence;
     gpsObj["satellites"] = gps.satellites.isValid() ? (int)gps.satellites.value() : 0;
     gpsObj["hdop"]       = gps.hdop.isValid() ? gps.hdop.hdop() : -1.0;
+
+    // ── Gyroscope data (for impact direction validation) ──────
+    JsonObject gyroObj = doc.createNestedObject("gyro");
+    gyroObj["x"] = roundf(lastGyroX * 100.0f) / 100.0f;
+    gyroObj["y"] = roundf(lastGyroY * 100.0f) / 100.0f;
+    gyroObj["z"] = roundf(lastGyroZ * 100.0f) / 100.0f;
 
     // ── Timestamp from GPS or fallback to millis ──────────────
     if (gps.date.isValid() && gps.time.isValid()) {
@@ -442,7 +504,12 @@ bool sendReport(float ax, float ay, float az,
 
     // ── HTTPS POST Setup ──────────────────────────────────────
     WiFiClientSecure client;
-    client.setInsecure(); // Required for self-signed certificates
+#ifdef ALLOW_INSECURE_TLS
+    // Lab-only mode. Do not use for real deployments.
+    client.setInsecure();
+#else
+    client.setCACert(BACKEND_ROOT_CA);
+#endif
     
     HTTPClient http;
     http.begin(client, SERVER_URL); // Use HTTPS client

@@ -6,8 +6,9 @@ const path  = require('path');
 const selfsigned = require('selfsigned');
 const app = require('./app');
 
-const HTTP_PORT  = 5000;
-const HTTPS_PORT = 5443;
+const HTTP_PORT  = Number(process.env.PORT || 5000);
+const HTTPS_PORT = Number(process.env.HTTPS_PORT || 5443);
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 // ── Start Servers ─────────────────────────────────────────────────────────────
 
@@ -21,11 +22,18 @@ const HTTPS_PORT = 5443;
 
     let options = {};
 
-    if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+    if (process.env.TLS_KEY_PATH && process.env.TLS_CERT_PATH) {
+        options = {
+            key:  fs.readFileSync(process.env.TLS_KEY_PATH),
+            cert: fs.readFileSync(process.env.TLS_CERT_PATH)
+        };
+    } else if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
         options = {
             key:  fs.readFileSync(keyPath),
             cert: fs.readFileSync(certPath)
         };
+    } else if (IS_PROD) {
+        throw new Error('TLS_KEY_PATH and TLS_CERT_PATH are required in production.');
     } else {
         console.log('🛡️  [Server] Generating self-signed TLS certificate (async)...');
         const attrs = [{ name: 'commonName', value: 'localhost' }];
@@ -40,10 +48,12 @@ const HTTPS_PORT = 5443;
         };
     }
 
-    // 1. Standard HTTP (Port 5000)
-    http.createServer(app).listen(HTTP_PORT, () => {
-        console.log(`🚀 [HTTP]  Server running on http://localhost:${HTTP_PORT}`);
-    });
+    // 1. Standard HTTP (development only unless explicitly enabled)
+    if (!IS_PROD || process.env.ENABLE_HTTP === 'true') {
+        http.createServer(app).listen(HTTP_PORT, () => {
+            console.log(`🚀 [HTTP]  Server running on http://localhost:${HTTP_PORT}`);
+        });
+    }
 
     // 2. Secure HTTPS (Port 5443)
     https.createServer(options, app).listen(HTTPS_PORT, () => {

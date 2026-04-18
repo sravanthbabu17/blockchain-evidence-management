@@ -1,0 +1,279 @@
+{
+  "timestamp": "2026-04-17T06:45:27.199Z",
+  "note": "Gas values from Hardhat local tests. Update after npx hardhat test.",
+  "measurements": {
+    "deploy": {
+      "gas": 2100000,
+      "description": "Contract deployment"
+    },
+    "addEvidenceRecord": {
+      "gas": 406821,
+      "description": "Submit evidence with ECDSA signature"
+    },
+    "logCustodyEvent": {
+      "gas": 31400,
+      "description": "Log custody action (event + state)"
+    },
+    "transferCustody": {
+      "gas": 56091,
+      "description": "Transfer custody to new custodian"
+    },
+    "grantRole": {
+      "gas": 48448,
+      "description": "Grant RBAC role"
+    },
+    "revokeRole": {
+      "gas": 28000,
+      "description": "Revoke RBAC role"
+    },
+    "verifyCID": {
+      "gas": 35000,
+      "description": "On-chain CID verification (view)"
+    },
+    "verifySignature": {
+      "gas": 30000,
+      "description": "Re-verify stored signature (view)"
+    }
+  },
+  "networks": {
+    "Ethereum Mainnet": {
+      "gasPrice_gwei": 25,
+      "ethPrice_usd": 3200
+    },
+    "Sepolia Testnet": {
+      "gasPrice_gwei": 1,
+      "ethPrice_usd": 0
+    },
+    "Polygon PoS": {
+      "gasPrice_gwei": 30,
+      "ethPrice_usd": 0.75
+    },
+    "Arbitrum One": {
+      "gasPrice_gwei": 0.1,
+      "ethPrice_usd": 3200
+    },
+    "Optimism": {
+      "gasPrice_gwei": 0.05,
+      "ethPrice_usd": 3200
+    }
+  },
+  "costTable": [
+    {
+      "function": "deploy",
+      "description": "Contract deployment",
+      "gasUsed": 2100000,
+      "costs": {
+        "Ethereum Mainnet": {
+          "costInToken": "0.05250000",
+          "costInUsd": "168.0000"
+        },
+        "Sepolia Testnet": {
+          "costInToken": "0.00210000",
+          "costInUsd": "0.0000"
+        },
+        "Polygon PoS": {
+          "costInToken": "0.06300000",
+          "costInUsd": "0.0473"
+        },
+        "Arbitrum One": {
+          "costInToken": "0.00021000",
+          "costInUsd": "0.6720"
+        },
+        "Optimism": {
+          "costInToken": "0.00010500",
+          "costInUsd": "0.3360"
+        }
+      }
+    },
+    {
+      "function": "addEvidenceRecord",
+      "description": "Submit evidence with ECDSA signature",
+      "gasUsed": 406821,
+      "costs": {
+        "Ethereum Mainnet": {
+          "costInToken": "0.01017052",
+          "costInUsd": "32.5457"
+        },
+        "Sepolia Testnet": {
+          "costInToken": "0.00040682",
+          "costInUsd": "0.0000"
+        },
+        "Polygon PoS": {
+          "costInToken": "0.01220463",
+          "costInUsd": "0.0092"
+        },
+        "Arbitrum One": {
+          "costInToken": "0.00004068",
+          "costInUsd": "0.1302"
+        },
+        "Optimism": {
+          "costInToken": "0.00002034",
+          "costInUsd": "0.0651"
+        }
+      }
+    },
+    {
+      "function": "logCustodyEvent",
+      "description": "Log custody action (event + state)",
+      "gasUsed": 31400,
+      "costs": {
+        "Ethereum Mainnet": {
+          "costInToken": "0.00078500",
+          "costInUsd": "2.5120"
+        },
+        "Sepolia Testnet": {
+          "costInToken": "0.00003140",
+          "costInUsd": "0.0000"
+        },
+        "Polygon PoS": {
+          "costInToken": "0.00094200",
+          "costInUsd": "0.0007"
+        },
+        "Arbitrum One": {
+          "costInToken": "0.00000314",
+          "costInUsd": "0.0100"
+        },
+        "Optimism": {
+          "costInToken": "0.00000157",
+          "costInUsd": "0.0050"
+        }
+      }
+    },
+    {
+      "function": "transferCustody",
+      "description": "Transfer custody to new custodian",
+      "gasUsed": 56091,
+      "costs": {
+        "Ethereum Mainnet": {
+          "costInToken": "0.00140227",
+          "costInUsd": "4.4873"
+        },
+        "Sepolia Testnet": {
+          "costInToken": "0.00005609",
+          "costInUsd": "0.0000"
+        },
+        "Polygon PoS": {
+          "costInToken": "0.00168273",
+          "costInUsd": "0.0013"
+        },
+        "Arbitrum One": {
+          "costInToken": "0.00000561",
+          "costInUsd": "0.0179"
+        },
+        "Optimism": {
+          "costInToken": "0.00000280",
+          "costInUsd": "0.0090"
+        }
+      }
+    },
+    {
+      "function": "grantRole",
+      "description": "Grant RBAC role",
+      "gasUsed": 48448,
+      "costs": {
+        "Ethereum Mainnet": {
+          "costInToken": "0.00121120",
+          "costInUsd": "3.8758"
+        },
+        "Sepolia Testnet": {
+          "costInToken": "0.00004845",
+          "costInUsd": "0.0000"
+        },
+        "Polygon PoS": {
+          "costInToken": "0.00145344",
+          "costInUsd": "0.0011"
+        },
+        "Arbitrum One": {
+          "costInToken": "0.00000484",
+          "costInUsd": "0.0155"
+        },
+        "Optimism": {
+          "costInToken": "0.00000242",
+          "costInUsd": "0.0078"
+        }
+      }
+    },
+    {
+      "function": "revokeRole",
+      "description": "Revoke RBAC role",
+      "gasUsed": 28000,
+      "costs": {
+        "Ethereum Mainnet": {
+          "costInToken": "0.00070000",
+          "costInUsd": "2.2400"
+        },
+        "Sepolia Testnet": {
+          "costInToken": "0.00002800",
+          "costInUsd": "0.0000"
+        },
+        "Polygon PoS": {
+          "costInToken": "0.00084000",
+          "costInUsd": "0.0006"
+        },
+        "Arbitrum One": {
+          "costInToken": "0.00000280",
+          "costInUsd": "0.0090"
+        },
+        "Optimism": {
+          "costInToken": "0.00000140",
+          "costInUsd": "0.0045"
+        }
+      }
+    },
+    {
+      "function": "verifyCID",
+      "description": "On-chain CID verification (view)",
+      "gasUsed": 35000,
+      "costs": {
+        "Ethereum Mainnet": {
+          "costInToken": "0.00087500",
+          "costInUsd": "2.8000"
+        },
+        "Sepolia Testnet": {
+          "costInToken": "0.00003500",
+          "costInUsd": "0.0000"
+        },
+        "Polygon PoS": {
+          "costInToken": "0.00105000",
+          "costInUsd": "0.0008"
+        },
+        "Arbitrum One": {
+          "costInToken": "0.00000350",
+          "costInUsd": "0.0112"
+        },
+        "Optimism": {
+          "costInToken": "0.00000175",
+          "costInUsd": "0.0056"
+        }
+      }
+    },
+    {
+      "function": "verifySignature",
+      "description": "Re-verify stored signature (view)",
+      "gasUsed": 30000,
+      "costs": {
+        "Ethereum Mainnet": {
+          "costInToken": "0.00075000",
+          "costInUsd": "2.4000"
+        },
+        "Sepolia Testnet": {
+          "costInToken": "0.00003000",
+          "costInUsd": "0.0000"
+        },
+        "Polygon PoS": {
+          "costInToken": "0.00090000",
+          "costInUsd": "0.0007"
+        },
+        "Arbitrum One": {
+          "costInToken": "0.00000300",
+          "costInUsd": "0.0096"
+        },
+        "Optimism": {
+          "costInToken": "0.00000150",
+          "costInUsd": "0.0048"
+        }
+      }
+    }
+  ],
+  "perIncidentGas": 438221
+}

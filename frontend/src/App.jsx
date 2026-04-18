@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { db, auth } from "./firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
+import API from "./services/api";
 
 /* ── Animated hex-shield logo ─────────────────────────────────────────── */
 function ShieldLogo() {
@@ -49,9 +50,8 @@ function CameraStatusPill() {
 
   useEffect(() => {
     const fetch_ = () =>
-      fetch('http://localhost:5000/api/camera/status')
-        .then(r => r.json())
-        .then(d => setStatus(d.camera))
+      API.get('/camera/status')
+        .then(({ data }) => setStatus(data.camera))
         .catch(() => setStatus(null));
     fetch_();
     const id = setInterval(fetch_, 8000);

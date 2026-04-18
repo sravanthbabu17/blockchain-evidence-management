@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { verifyByCID } = require('../controllers/verifyController');
+const { verifyByCID, checkHashAnchored } = require('../controllers/verifyController');
 
-// GET /api/verify/:cid  — no auth needed, blockchain data is public
+// Blockchain data is public, but these routes remain read-only.
+router.get('/hash-check/:hash', checkHashAnchored);
 router.get('/:cid', verifyByCID);
 
 module.exports = router;

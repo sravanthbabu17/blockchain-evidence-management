@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../firebase";
 import API from '../services/api';
@@ -52,9 +52,8 @@ function CameraWidget() {
 
   useEffect(() => {
     const load = () =>
-      fetch('http://localhost:5000/api/camera/status')
-        .then(r => r.json())
-        .then(d => setStatus(d.camera))
+      API.get('/camera/status')
+        .then(({ data }) => setStatus(data.camera))
         .catch(() => {});
     load();
     const id = setInterval(load, 6000);
@@ -135,7 +134,10 @@ export default function Dashboard({ user }) {
   const [filteredRecords,  setFilteredRecords]  = useState([]);
   const [loading,          setLoading]          = useState(true);
   const [view,             setView]             = useState('grid');
+  const [sort,             setSort]             = useState('newest');
   const [investigators,    setInvestigators]    = useState([]);
+  
+  if (!user) return null;
   const role = user.role;
 
   useEffect(() => {
@@ -166,14 +168,27 @@ export default function Dashboard({ user }) {
     return d;
   };
 
-  const handleFilter = ({ search, status }) => {
+  const handleFilter = ({ search, status, sort: newSort }) => {
     let f = records;
     if (search) f = f.filter(r => (r.vehicle_id || '').toLowerCase().includes(search.toLowerCase()));
     if (status && status !== 'all') f = f.filter(r => r.status === status);
+    
+    setSort(newSort || 'newest');
     setFilteredRecords(f);
   };
 
-  const visible = filterByRole(filteredRecords);
+  const getVisibleRecords = () => {
+    let d = filterByRole(filteredRecords);
+    
+    // 🔀 Sorting Logic
+    return [...d].sort((a, b) => {
+      const timeA = new Date(a.timestamp || a.id).getTime();
+      const timeB = new Date(b.timestamp || b.id).getTime();
+      return sort === 'newest' ? timeB - timeA : timeA - timeB;
+    });
+  };
+
+  const visible = getVisibleRecords();
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '16px' }}>

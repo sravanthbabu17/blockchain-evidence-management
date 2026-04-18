@@ -16,12 +16,18 @@ const fs      = require('fs');
 
 const { startRecording, getStatus } = require('./services/videoRecorder');
 const metricsLogger = require('./utils/metricsLogger');
+const verifyFirebaseToken = require('./middleware/authMiddleware');
+const { allowRoles } = require('./middleware/roleMiddleware');
+const { corsOptions, securityHeaders, rateLimit } = require('./middleware/securityMiddleware');
+const accidentService = require('./services/accidentService');
 
 const app = express();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors());
-app.use(express.json());
+app.use(securityHeaders);
+app.use(cors(corsOptions));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '128kb' }));
+app.use('/api', rateLimit('api', process.env.API_RATE_LIMIT || 300));
 
 // ── Ensure required directories exist ────────────────────────────────────────
 ['uploads/temp', 'uploads/chunks', 'videos', 'data'].forEach(dir => {
@@ -35,16 +41,45 @@ app.use(express.json());
 startRecording();
 
 // ── Serve forensic video files to the dashboard ─────────────────────────────
-app.use('/videos', express.static(path.join(__dirname, 'videos')));
+const canReadRecord = (user, record) => {
+    if (!user || !record) return false;
+    if (user.role === 'admin') return true;
+    if (user.role === 'investigator' && record.assignedTo === user.email) return true;
+    if (user.role === 'owner' && record.vehicle_id === user.vehicle_id) return true;
+    return false;
+};
 
 // ── Mount application routes ──────────────────────────────────────────────────
 const accidentRoutes = require('./routes/accidentRoutes');
 const impactRoutes   = require('./routes/impactRoutes');
 const verifyRoutes   = require('./routes/verifyRoutes');
+const custodyRoutes  = require('./routes/custodyRoutes');
 
 app.use('/api/accident', accidentRoutes);
-app.use('/api',          impactRoutes);
+app.use('/api',          rateLimit('impact', process.env.IMPACT_RATE_LIMIT || 20), impactRoutes);
 app.use('/api/verify',   verifyRoutes);
+app.use('/api/custody',  custodyRoutes);
+
+app.get('/api/videos/:filename', verifyFirebaseToken, (req, res) => {
+    const filename = path.basename(req.params.filename || '');
+    if (!/^[A-Za-z0-9_.-]+\.mp4$/.test(filename)) {
+        return res.status(400).json({ success: false, message: 'Invalid video filename' });
+    }
+
+    const record = accidentService.getAllRecords().find(r => {
+        const localPath = r.video?.local || r.video?.localPath || '';
+        return path.basename(localPath) === filename;
+    });
+
+    if (!record) {
+        return res.status(404).json({ success: false, message: 'Video evidence not found' });
+    }
+    if (!canReadRecord(req.user, record)) {
+        return res.status(403).json({ success: false, message: 'Access denied for this video evidence' });
+    }
+
+    return res.sendFile(path.join(__dirname, 'videos', filename));
+});
 
 // ── Research Paper Evaluation Endpoints ──────────────────────────────────────
 
@@ -53,7 +88,7 @@ app.use('/api/verify',   verifyRoutes);
  * Returns live camera recording state for the dashboard indicator and
  * for experimental disclosure in the research paper.
  */
-app.get('/api/camera/status', (req, res) => {
+app.get('/api/camera/status', verifyFirebaseToken, (req, res) => {
     res.json({ success: true, camera: getStatus() });
 });
 
@@ -70,7 +105,7 @@ app.get('/api/camera/status', (req, res) => {
  *   - video_capture_ms    (FFmpeg extraction + merge time)
  *   - total_pipeline_ms   (collision to blockchain confirmation)
  */
-app.get('/api/metrics', (req, res) => {
+app.get('/api/metrics', verifyFirebaseToken, allowRoles('admin'), (req, res) => {
     const summary = metricsLogger.getSummary();
     res.json({ success: true, metrics: summary });
 });
@@ -79,7 +114,7 @@ app.get('/api/metrics', (req, res) => {
  * GET /api/metrics/raw
  * Returns raw per-case trace data for CSV export / plotting.
  */
-app.get('/api/metrics/raw', (req, res) => {
+app.get('/api/metrics/raw', verifyFirebaseToken, allowRoles('admin'), (req, res) => {
     const traces = metricsLogger.getAllTraces();
     res.json({ success: true, count: traces.length, traces });
 });

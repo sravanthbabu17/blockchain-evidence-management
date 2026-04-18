@@ -47,8 +47,9 @@ async function sendAccident(data) {
 
         console.log(`📤 Sending Forensics...`);
         const response = await axios.post(API_URL, payload, {
-            headers: { "x-api-key": "device123" }
+            headers: { "x-api-key": "TEST_KEY_123" }
         });
+
 
         console.log("✅ Forensic Record Secured:", response.data.data?.hash || "Success (Hash in dashboard)");
         console.log("--------------------------------------------------");

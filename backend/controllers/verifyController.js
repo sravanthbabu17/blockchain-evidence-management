@@ -71,3 +71,18 @@ exports.verifyByCID = async (req, res) => {
         });
     }
 };
+
+exports.checkHashAnchored = async (req, res) => {
+    const { hash } = req.params;
+    if (!hash || !/^[a-fA-F0-9]{64}$/.test(hash)) {
+        return res.status(400).json({ success: false, message: 'Valid SHA-256 hash is required.' });
+    }
+
+    try {
+        const found = await blockchainService.isHashAnchored(hash);
+        return res.json({ success: true, found });
+    } catch (error) {
+        console.error('❌ [VerifyController] Hash check failed:', error.message);
+        return res.status(500).json({ success: false, message: 'Blockchain hash check failed: ' + error.message });
+    }
+};

@@ -1,5 +1,9 @@
 {
-  "address": "0xd2CFB837a34d9a704df42E87FfEC7E894D4715F4",
+  "address": "0xE3b50199431B2163cF84af4aFDe625E4E89445F0",
   "network": "sepolia",
-  "chainId": 11155111
+  "chainId": 11155111,
+  "deployer": "0xB6d6D84eC955a0be1816d59cfa5F126A3D42c367",
+  "deployedAt": "2026-04-17T12:29:02.801Z",
+  "gasUsed": "3651858",
+  "version": "2.0.0"
 }

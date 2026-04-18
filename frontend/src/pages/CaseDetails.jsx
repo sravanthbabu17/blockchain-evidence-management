@@ -1,19 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import StatusBadge from '../components/StatusBadge';
+import CustodyTimeline from '../components/CustodyTimeline';
+import SignatureBadge from '../components/SignatureBadge';
+import IpfsStatusPanel from '../components/IpfsStatusPanel';
 import { records as backupRecords } from '../data';
-import API from '../services/api';
+import API, { authenticatedApiUrl } from '../services/api';
 import jsPDF from 'jspdf';
 
 // Fix leaflet icon in webpack
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
-  iconUrl: require('leaflet/dist/images/marker-icon.png'),
-  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
 });
 
 export default function CaseDetails({ user }) {
@@ -26,12 +32,26 @@ export default function CaseDetails({ user }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [showDebug, setShowDebug] = useState(false);
+  const [localVideoUrl, setLocalVideoUrl] = useState('');
 
   useEffect(() => {
     API.get(`/accident/${id}`)
       .then(res => { if (res.data.success) setData(res.data.data); })
       .catch(err => console.warn("⚠️ Sync failed, using cached state.", err.message));
   }, [id]);
+
+  useEffect(() => {
+    const loadVideoUrl = async () => {
+      const localPath = data?.video?.local || data?.video?.localPath;
+      if (!localPath) {
+        setLocalVideoUrl('');
+        return;
+      }
+      const filename = localPath.split('/').pop();
+      setLocalVideoUrl(await authenticatedApiUrl(`/videos/${encodeURIComponent(filename)}`));
+    };
+    loadVideoUrl().catch(() => setLocalVideoUrl(''));
+  }, [data?.video?.local, data?.video?.localPath]);
 
   if (!data) return (
     <div className="dashboard-container">
@@ -363,7 +383,7 @@ export default function CaseDetails({ user }) {
               <InfoBox label={data.video.cid ? "Full Incident Evidence (60s)" : "Multi-modal Forensic Evidence"}>
                 {(data.video.local || data.video.localPath || data.video.cid) ? (
                   <video controls width="100%" style={{ borderRadius: '6px', background: '#000', marginTop: 8 }}>
-                    <source src={(data.video.local || data.video.localPath) ? `http://localhost:5000/${data.video.local || data.video.localPath}` : `https://gateway.pinata.cloud/ipfs/${data.video.cid}`}
+                    <source src={localVideoUrl || `https://gateway.pinata.cloud/ipfs/${data.video.cid}`}
                       type="video/mp4" />
                   </video>
                 ) : (
@@ -391,6 +411,53 @@ export default function CaseDetails({ user }) {
                 )) : <p style={{ color: 'var(--text-dim)', fontSize: '12px', fontStyle: 'italic' }}>No timeline events yet.</p>}
               </div>
             </InfoBox>
+
+            {/* v2.0: Chain of Custody */}
+            <CustodyTimeline
+              timeline={data.timeline || []}
+              onTransfer={currentRole !== 'owner' ? () => {
+                const addr = prompt('Enter new custodian address (0x...):');
+                const detail = prompt('Reason for transfer:');
+                if (addr && detail) {
+                  API.post(`/custody/${data.id}/transfer`, { newCustodian: addr, detail })
+                    .then(() => { setStatus('✅ Custody transferred on-chain.'); })
+                    .catch(e => setStatus(`❌ Transfer failed: ${e.message}`));
+                }
+              } : null}
+            />
+
+            {/* v2.0: ECDSA Signature Verification */}
+            <SignatureBadge signature={data.signature} />
+
+            {/* v2.0: IPFS Multi-Pin Status */}
+            <IpfsStatusPanel ipfsDetails={data.ipfsDetails} />
+
+            {/* v2.0: Impact Direction */}
+            {data.impactDirection && (
+              <div style={{
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: '14px', padding: '16px 20px',
+              }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 10px', color: 'var(--text)' }}>
+                  🧭 Impact Direction
+                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{
+                    fontSize: '28px', width: '48px', height: '48px', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center',
+                    background: '#8b5cf615', borderRadius: '12px', border: '1px solid #8b5cf630',
+                  }}>
+                    {data.impactDirection === 'FRONT' ? '↑' : data.impactDirection === 'REAR' ? '↓' :
+                     data.impactDirection === 'LEFT' ? '←' : data.impactDirection === 'RIGHT' ? '→' :
+                     data.impactDirection === 'ROLLOVER' ? '↻' : '↕'}
+                  </span>
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color: '#8b5cf6' }}>{data.impactDirection}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Classified from accelerometer vector at impact</div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Etherscan */}
             <a href={`https://sepolia.etherscan.io/tx/${data.txHash}`} target="_blank" rel="noreferrer"
