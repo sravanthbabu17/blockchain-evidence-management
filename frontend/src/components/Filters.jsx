@@ -11,13 +11,16 @@ export default function Filters({ onFilter }) {
 
   return (
     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-      <input
-        type="text"
-        placeholder="🔍  Search by vehicle ID..."
-        value={search}
-        onChange={e => { setSearch(e.target.value); handle(e.target.value, status, sort); }}
-        style={{ flex: '1', minWidth: '200px', maxWidth: '320px' }}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Search vehicle</label>
+        <input
+          type="text"
+          placeholder="Enter Vehicle Number (e.g. MH-01...)"
+          value={search}
+          onChange={e => { setSearch(e.target.value); handle(e.target.value, status, sort); }}
+          style={{ flex: '1', minWidth: '240px', maxWidth: '320px' }}
+        />
+      </div>
       <select
         value={status}
         onChange={e => { setStatus(e.target.value); handle(search, e.target.value, sort); }}

@@ -61,6 +61,11 @@
  * ============================================================
  */
 
+// ── Configuration Flags (Enable for testing) ─────────────────────────────────
+#define ALLOW_INSECURE_TLS      // Skip SSL certificate validation (useful for local dev)
+#define DEBUG_SENSORS           // Print detailed sensor readings to Serial
+#define SHOW_RESTING_VALUES     // Show initial magnitude for calibration check
+
 // ── Credentials (never hardcode — use credentials.h) ─────────────────────────
 #include "credentials.h"
 
@@ -78,13 +83,13 @@
 //  TUNABLE PARAMETERS  (do not touch unless re-calibrating)
 // ─────────────────────────────────────────────────────────────
 
-// STA/LTA windows (number of 200 ms samples)
-static const uint8_t  STA_WINDOW   = 5;    // 1.0 s short-term
-static const uint8_t  LTA_WINDOW   = 25;   // 5.0 s long-term
+// STA/LTA windows (number of 20 ms samples)
+static const uint8_t  STA_WINDOW   = 25;   // 0.5 s short-term
+static const uint16_t LTA_WINDOW   = 125;  // 2.5 s long-term
 
 // Trigger thresholds
-static const float    STA_LTA_RATIO_THRESHOLD = 3.0f;  // dimensionless
-static const float    JERK_THRESHOLD          = 8.0f;  // m/s³
+static const float    STA_LTA_RATIO_THRESHOLD = 1.2f;  // Extremely sensitive for testing (was 1.5)
+static const float    JERK_THRESHOLD          = 3.0f;  // Lowered for manual testing (was 8.0)
 
 // Cooldown after a reported collision
 static const unsigned long COOLDOWN_MS = 30000UL;   // 30 s
@@ -139,6 +144,9 @@ unsigned long lastFixTime = 0;
 const char* gpsSourceStr  = "unavailable";
 const char* gpsConfidence = "none";
 
+// ── Offset Calibration ────────────────────────────────────────
+float magnitudeOffset = 0.0f; 
+
 // ─────────────────────────────────────────────────────────────
 //  SETUP
 // ─────────────────────────────────────────────────────────────
@@ -159,8 +167,8 @@ void setup() {
     initGPS();
 
     // Initialise ring buffers to steady-state (gravity + ~0 noise)
-    for (uint8_t i = 0; i < LTA_WINDOW; i++) ltaBuffer[i] = 9.8f;
-    for (uint8_t i = 0; i < STA_WINDOW;  i++) staBuffer[i] = 9.8f;
+    for (uint16_t i = 0; i < LTA_WINDOW; i++) ltaBuffer[i] = 9.8f;
+    for (uint16_t i = 0; i < STA_WINDOW;  i++) staBuffer[i] = 9.8f;
     ltaFull = staFull = true;
 
     prevMagnitude  = 9.8f;
@@ -168,6 +176,16 @@ void setup() {
 
     Serial.println("\n✅ System ready. Monitoring for collisions (STA/LTA)...");
     Serial.println("----------------------------------------");
+
+#ifdef SHOW_RESTING_VALUES
+    // Capture and show initial resting magnitude
+    sensors_event_t a, g, t;
+    if (mpu.getEvent(&a, &g, &t)) {
+        float m = sqrtf(a.acceleration.x*a.acceleration.x + a.acceleration.y*a.acceleration.y + a.acceleration.z*a.acceleration.z);
+        magnitudeOffset = 9.81f - m; // Calculate how far off we are from 1G
+        Serial.printf("📊 Raw magnitude: %.2f | Offset: %.2f | Calibrated: %.2f\n", m, magnitudeOffset, m + magnitudeOffset);
+    }
+#endif
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -194,7 +212,7 @@ void loop() {
     float ax = accel.acceleration.x;
     float ay = accel.acceleration.y;
     float az = accel.acceleration.z;
-    float magnitude = sqrtf(ax*ax + ay*ay + az*az);
+    float magnitude = sqrtf(ax*ax + ay*ay + az*az) + magnitudeOffset;
 
     // Store gyro readings for impact direction classification
     lastGyroX = gyro.gyro.x;
@@ -221,34 +239,33 @@ void loop() {
 
     // ── Compute STA and LTA means ─────────────────────────────
     float ltaSum = 0, staSum = 0;
-    uint8_t ltaCount = ltaFull ? LTA_WINDOW : ltaHead;
-    uint8_t staCount = staFull ? STA_WINDOW  : staHead;
+    uint16_t ltaCount = ltaFull ? LTA_WINDOW : ltaHead;
+    uint16_t staCount = staFull ? STA_WINDOW : staHead;
 
-    for (uint8_t i = 0; i < ltaCount; i++) ltaSum += ltaBuffer[i];
-    for (uint8_t i = 0; i < staCount; i++) staSum += staBuffer[i];
+    for (uint16_t i = 0; i < ltaCount; i++) ltaSum += ltaBuffer[i];
+    for (uint16_t i = 0; i < staCount; i++) staSum += staBuffer[i];
 
-    float lta       = (ltaCount > 0) ? ltaSum / ltaCount : 9.8f;
-    float sta       = (staCount > 0) ? staSum / staCount : 9.8f;
-    float staltaRatio = (lta > 0.1f) ? sta / lta : 1.0f;
+    float lta = (ltaCount > 0) ? (ltaSum / (float)ltaCount) : magnitude;
+    float sta = (staCount > 0) ? (staSum / (float)staCount) : magnitude;
+    float staltaRatio = (lta > 0.1f) ? (sta / lta) : 1.0f;
 
     // ── Print live readings ───────────────────────────────────
-    Serial.printf("[#%lu] |a|=%.2f  STA=%.2f  LTA=%.2f  R=%.2f  J=%.2f m/s³\n",
-                  (unsigned long)sampleCount, magnitude, sta, lta, staltaRatio, jerk);
+#ifdef DEBUG_SENSORS
+    Serial.printf("[#%lu] |a|=%.2f STA=%.2f LTA=%.2f R=%.2f J=%.2f | GPS: %s\n",
+                  (unsigned long)sampleCount, magnitude, sta, lta, staltaRatio, jerk,
+                  gps.location.isValid() ? "FIX" : "NO FIX");
+#endif
 
-    // ── Dual-condition collision detector ─────────────────────
+    // ── Dual-condition collision detector (OR logic for easier testing) ─────────────
     bool stalttaTrigger = (staltaRatio >= STA_LTA_RATIO_THRESHOLD);
     bool jerkTrigger    = (jerk >= JERK_THRESHOLD);
     bool inCooldown     = ((now - lastReportTime) < COOLDOWN_MS);
 
-    if (stalttaTrigger && !inCooldown) {
-        if (!jerkTrigger) {
-            // STA/LTA triggered but jerk too low → probable road bump / vibration
-            falsePositives++;
-            Serial.printf("   ⚠️  STA/LTA spike (R=%.2f) — jerk %.2f < %.2f → suppressed (FP #%lu)\n",
-                          staltaRatio, jerk, JERK_THRESHOLD, (unsigned long)falsePositives);
-        } else {
-            // Both conditions met → confirmed collision
-            Serial.println("\n💥 COLLISION CONFIRMED (STA/LTA + Jerk)!");
+    if ((stalttaTrigger || jerkTrigger) && !inCooldown) {
+        // Confirmed collision - start cooldown immediately to prevent spamming
+        lastReportTime = now; 
+        
+        Serial.println("\n💥 COLLISION DETECTED!");
             Serial.printf("   STA/LTA Ratio : %.2f  (threshold: %.1f)\n",
                           staltaRatio, STA_LTA_RATIO_THRESHOLD);
             Serial.printf("   Jerk          : %.2f m/s³  (threshold: %.1f)\n",
@@ -272,7 +289,6 @@ void loop() {
                 bool sent = sendReport(ax, ay, az, magnitude, jerk, staltaRatio,
                                        reportLat, reportLon, hasFix, impactDir);
                 if (sent) {
-                    lastReportTime = now;
                     Serial.printf("   ⏳ Cooldown: %lu s\n", COOLDOWN_MS / 1000);
                 }
             } else {
@@ -283,7 +299,7 @@ void loop() {
         }
     }
 
-    delay(200);  // 5 Hz sample rate
+    delay(20);  // 50 Hz sample rate (much faster to catch impacts)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -502,20 +518,30 @@ bool sendReport(float ax, float ay, float az,
     serializeJson(doc, payload);
     Serial.println("   Payload: " + payload);
 
-    // ── HTTPS POST Setup ──────────────────────────────────────
-    WiFiClientSecure client;
-#ifdef ALLOW_INSECURE_TLS
-    // Lab-only mode. Do not use for real deployments.
-    client.setInsecure();
-#else
-    client.setCACert(BACKEND_ROOT_CA);
-#endif
-    
+    // ── HTTP/HTTPS POST Setup ──────────────────────────────────────
     HTTPClient http;
-    http.begin(client, SERVER_URL); // Use HTTPS client
+    String url = SERVER_URL;
+    bool isHttps = url.startsWith("https://");
+
+    WiFiClientSecure secureClient;
+    WiFiClient client;
+
+    if (isHttps) {
+        Serial.println("   🔐 Connection: HTTPS");
+#ifdef ALLOW_INSECURE_TLS
+        secureClient.setInsecure();
+#else
+        secureClient.setCACert(BACKEND_ROOT_CA);
+#endif
+        http.begin(secureClient, url);
+    } else {
+        Serial.println("   🔓 Connection: HTTP (Insecure)");
+        http.begin(client, url);
+    }
+
     http.addHeader("Content-Type", "application/json");
     http.addHeader("x-api-key", API_KEY);
-    http.setTimeout(10000);
+    http.setTimeout(60000); // 60s (Increased for Blockchain/IPFS latency)
 
     int httpCode = http.POST(payload);
 

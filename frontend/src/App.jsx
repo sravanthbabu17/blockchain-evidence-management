@@ -27,7 +27,6 @@ function ShieldLogo() {
         strokeWidth="1"
         opacity="0.6"
       />
-      {/* Chain link icon inside */}
       <path d="M13 14.5h2m2 0h2M16 12v5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" opacity="0.85"/>
       <defs>
         <linearGradient id="shield-grad" x1="4" y1="2" x2="28" y2="30" gradientUnits="userSpaceOnUse">
@@ -44,7 +43,7 @@ function ShieldLogo() {
   );
 }
 
-/* ── Camera status pill — fetches /api/camera/status ─────────────────── */
+/* ── Camera status pill ─────────────────────────────────────────────── */
 function CameraStatusPill() {
   const [status, setStatus] = useState(null);
 
@@ -82,7 +81,7 @@ function ChainPill() {
   );
 }
 
-/* ── Navbar link using useLocation hook for active detection ──────────── */
+/* ── Navbar link ─────────────────────────────────────────────────────── */
 function NavLink({ to, children }) {
   const location = useLocation();
   const active   = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
@@ -107,7 +106,6 @@ function NavLink({ to, children }) {
   );
 }
 
-/* ── App ──────────────────────────────────────────────────────────────── */
 export default function App() {
   const [user, setUser]         = useState(null);
   const [userData, setUserData] = useState(null);
@@ -133,7 +131,6 @@ export default function App() {
     fetchUserData();
   }, [user]);
 
-  /* ── Auth screen ──────────────────────────────────────────────────────── */
   if (!user) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: '20px' }}>
@@ -144,7 +141,6 @@ export default function App() {
     );
   }
 
-  /* ── Loading user profile ─────────────────────────────────────────────── */
   if (!userData) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', gap: '16px' }}>
@@ -159,7 +155,6 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {/* ── NAVBAR ─────────────────────────────────────────────────────── */}
       <nav style={{
         position: 'sticky', top: 0, zIndex: 1000,
         background: 'var(--nav-bg)',
@@ -172,7 +167,6 @@ export default function App() {
         alignItems: 'center',
         justifyContent: 'space-between',
       }}>
-        {/* Left */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
             <ShieldLogo />
@@ -185,7 +179,6 @@ export default function App() {
             </span>
           </Link>
 
-          {/* Nav links — need BrowserRouter context so rendered inside */}
           <div style={{ display: 'flex', gap: '2px' }}>
             <NavLink to="/">Dashboard</NavLink>
             <NavLink to="/verify">Verify</NavLink>
@@ -193,16 +186,12 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {/* Live status pills */}
           <CameraStatusPill />
           <ChainPill />
 
-          {/* Theme */}
           <button
             onClick={toggleTheme}
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             style={{
               background: 'var(--surface-2)',
               border: '1px solid var(--border)',
@@ -217,7 +206,6 @@ export default function App() {
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
 
-          {/* User chip */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             background: 'var(--surface)', border: '1px solid var(--border)',
@@ -258,7 +246,6 @@ export default function App() {
         </div>
       </nav>
 
-      {/* ── ROUTES ─────────────────────────────────────────────────────── */}
       <main style={{ minHeight: 'calc(100vh - 62px)', position: 'relative', zIndex: 1 }}>
         <Routes>
           <Route path="/"         element={<Dashboard user={userData} />} />
