@@ -8,6 +8,6 @@ if (!admin.apps.length) {
 }
 
 // 🛡️ Robust Firestore Configuration
-admin.firestore().settings({ ignoreUndefinedProperties: true });
+admin.firestore().settings({ ignoreUndefinedProperties: true, preferRest: true });
 
 module.exports = admin;
