@@ -1,4 +1,4 @@
-<![CDATA[<div align="center">
+<div align="center">
 
 # 🔗 EvidenceChain
 
@@ -543,4 +543,4 @@ This project is part of an academic research submission. See [LICENSE](LICENSE) 
 Built with ⛓️ by [Sravanth Babu](https://github.com/sravanthbabu17)
 
 </div>
-]]>
+
